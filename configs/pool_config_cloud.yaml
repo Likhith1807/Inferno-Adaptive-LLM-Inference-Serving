@@ -1,0 +1,24 @@
+# Cloud replica pool: one replica per GPU (g5.12xlarge = 4x A10G). Heterogeneous tiers as in the local study,
+# but on separate GPUs, so there is no memory-bandwidth contention between replicas.
+base_port: 8100
+pool:
+  - name: fast
+    quantization: int4
+    batch_size: 16
+    max_num_batched_tokens: 512
+    gpu_memory_utilization: 0.90
+    gpu_index: 0
+  - name: bulk
+    quantization: int4
+    batch_size: 64
+    max_num_batched_tokens: 4096
+    gpu_memory_utilization: 0.90
+    gpu_index: 1
+
+adaptive:
+  long_prompt_tokens: 512
+  escalate_util: 0.70
+  deescalate_util: 0.25
+  calm_ticks_required: 5
+  spill_util: 0.90
+  tick_sec: 1.0

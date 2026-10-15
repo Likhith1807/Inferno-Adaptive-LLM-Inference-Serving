@@ -1,0 +1,46 @@
+{
+  "single_fixed_tier": "fixed-bulk",
+  "worst_case_regret": {
+    "fixed-fast": 1.7582760917659779,
+    "fixed-bulk": 1.0336398034678789
+  },
+  "rows": [
+    {
+      "pattern": "bursty",
+      "p99_fast": 20.116379424516893,
+      "p99_bulk": 11.440967387728282,
+      "oracle_tier": "fixed-bulk",
+      "oracle_p99": 11.440967387728282,
+      "static_lb_p99": 24.243886024382007,
+      "adaptive_p99": 24.29357666448235,
+      "single_fixed_regret": 0.0,
+      "oracle_gain_vs_single_pct": 0.0,
+      "adaptive_vs_oracle_pct": 112.33848363679395
+    },
+    {
+      "pattern": "mixed_length",
+      "p99_fast": 5.928559600000559,
+      "p99_bulk": 6.127995179792185,
+      "oracle_tier": "fixed-fast",
+      "oracle_p99": 5.928559600000559,
+      "static_lb_p99": 17.626939493873117,
+      "adaptive_p99": 18.039625591396582,
+      "single_fixed_regret": 0.03363980346787887,
+      "oracle_gain_vs_single_pct": 3.2544996192113373,
+      "adaptive_vs_oracle_pct": 204.28344840110708
+    },
+    {
+      "pattern": "steady",
+      "p99_fast": 7.979778418532938,
+      "p99_bulk": 6.176759790197691,
+      "oracle_tier": "fixed-bulk",
+      "oracle_p99": 6.176759790197691,
+      "static_lb_p99": 18.597043403489664,
+      "adaptive_p99": 18.23751029468732,
+      "single_fixed_regret": 0.0,
+      "oracle_gain_vs_single_pct": 0.0,
+      "adaptive_vs_oracle_pct": 195.2601511820102
+    }
+  ],
+  "max_headroom_pct": 3.2544996192113373
+}

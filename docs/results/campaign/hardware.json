@@ -1,0 +1,23 @@
+{
+  "timestamp_utc": "2026-09-24T15:43:21.970913+00:00",
+  "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.43",
+  "python": "3.12.14",
+  "gpus": [
+    {
+      "name": "NVIDIA GeForce RTX 4060 Laptop GPU",
+      "driver_version": "566.07",
+      "memory.total": "8188",
+      "clocks.max.sm": "3105",
+      "clocks.max.mem": "8001",
+      "power.limit": "[N/A]"
+    }
+  ],
+  "packages": {
+    "vllm": "0.11.0",
+    "torch": "2.8.0",
+    "transformers": "4.57.1",
+    "numpy": "2.2.6",
+    "httpx": "0.28.1"
+  },
+  "git_commit": null
+}

@@ -1,0 +1,17 @@
+repetitions: 8
+confidence_level: 0.95
+
+load_patterns_to_test: ["steady", "bursty", "mixed_length"]
+
+configs_to_test:
+  fixed:
+    - { batch_size: 1,  quantization: "fp16" }
+    - { batch_size: 16, quantization: "fp16" }
+    - { batch_size: 16, quantization: "int8" }
+    - { batch_size: 32, quantization: "int4" }
+    - { batch_size: 64, quantization: "int4" }
+  adaptive: true
+
+replica_counts_to_test: [1, 2, 4]
+
+output_dir: "results/"

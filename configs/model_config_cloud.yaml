@@ -1,0 +1,28 @@
+# Cloud study: a 7B model (does not fit an 8 GB laptop GPU). Same official Qwen releases family as the
+# local 1.5B study, so the cloud-vs-local comparison changes model size and hardware, not architecture.
+# fp16 7B ~ 15 GB: fits one A10G (24 GB) with KV-cache headroom.
+model:
+  base: "Qwen/Qwen2.5-7B-Instruct"
+  max_model_len: 4096
+
+checkpoints:
+  fp16: "Qwen/Qwen2.5-7B-Instruct"
+  int8: "Qwen/Qwen2.5-7B-Instruct-GPTQ-Int8"
+  int4: "Qwen/Qwen2.5-7B-Instruct-AWQ"
+
+vllm_quantization:
+  fp16: null
+  int8: "gptq_marlin"     # vLLM fast path (plain "gptq"/"awq" select the older, slower kernels)
+  int4: "awq_marlin"
+
+quantization:
+  levels: ["fp16", "int8", "int4"]
+
+batch_sizes: [1, 8, 16, 32, 64]
+
+server:
+  backend: "vllm"
+  host: "127.0.0.1"
+  port: 8000
+  gpu_memory_utilization: 0.90     # one replica per GPU on the cloud box
+  startup_timeout_sec: 900

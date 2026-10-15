@@ -1,0 +1,56 @@
+{
+  "run": "campaign_20260924_154321",
+  "hypothesis_h1": [
+    {
+      "pattern": "bursty",
+      "best_fixed": "fixed-bulk",
+      "n_pairs": 8,
+      "treatment_mean": 24.2935766645,
+      "fixed_mean": 11.4409673877,
+      "pct_change": 112.3384836368,
+      "diff_ci_lo": 11.8385705085,
+      "diff_ci_hi": 13.8589742113,
+      "cohens_dz": 8.2187413989,
+      "p_ttest": 6.92e-08,
+      "p_wilcoxon": 0.0078125,
+      "throughput_ratio": 0.943670822,
+      "throughput_noninferior": false,
+      "p_holm": 0.0234375,
+      "verdict": "adaptive WORSE: p99 +112.3% (Holm p=0.0234)"
+    },
+    {
+      "pattern": "mixed_length",
+      "best_fixed": "fixed-fast",
+      "n_pairs": 8,
+      "treatment_mean": 18.0396255914,
+      "fixed_mean": 5.9285596,
+      "pct_change": 204.2834484011,
+      "diff_ci_lo": 11.530084299,
+      "diff_ci_hi": 12.8179793476,
+      "cohens_dz": 11.9603247276,
+      "p_ttest": 5.1e-09,
+      "p_wilcoxon": 0.0078125,
+      "throughput_ratio": 0.9561994722,
+      "throughput_noninferior": false,
+      "p_holm": 0.0234375,
+      "verdict": "adaptive WORSE: p99 +204.3% (Holm p=0.0234)"
+    },
+    {
+      "pattern": "steady",
+      "best_fixed": "fixed-bulk",
+      "n_pairs": 8,
+      "treatment_mean": 18.2375102947,
+      "fixed_mean": 6.1767597902,
+      "pct_change": 195.260151182,
+      "diff_ci_lo": 11.3312989115,
+      "diff_ci_hi": 12.8756757368,
+      "cohens_dz": 9.9819081651,
+      "p_ttest": 1.8e-08,
+      "p_wilcoxon": 0.0078125,
+      "throughput_ratio": 0.9419984177,
+      "throughput_noninferior": false,
+      "p_holm": 0.0234375,
+      "verdict": "adaptive WORSE: p99 +195.3% (Holm p=0.0234)"
+    }
+  ]
+}

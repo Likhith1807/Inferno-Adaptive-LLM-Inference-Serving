@@ -1,0 +1,610 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inferno: adaptive LLM serving, measured honestly</title>
+<meta name="description" content="A CUDA kernel, an MPI router and an adaptive controller for LLM inference, measured end to end on an 8 GB laptop GPU, including the hypothesis that failed.">
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #0a0c10; --bg2: #0f131a; --card: rgba(255,255,255,.04); --card2: rgba(255,255,255,.07);
+  --border: rgba(255,255,255,.10); --ink: #f5f7fa; --ink2: #b1b9c4; --muted: #808995;
+  --grid: rgba(255,255,255,.08); --axis: rgba(255,255,255,.22);
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --adaptive: #ffffff;
+  --l0: #256abf; --l1: #3987e5; --l2: #5598e7; --l3: #86b6ef; --l4: #b7d3f6; --l5: #d3e4f9; --l6: #e8f1fc; --neutral: #5c5b56;
+  --bad: #f0706f; --good: #38c172; --warn: #f0b429; --on-l4: #0b0b0b; --on-neutral: #ffffff;
+  --glow1: rgba(57,135,229,.28); --glow2: rgba(25,158,112,.22);
+  --shadow: 0 10px 40px rgba(0,0,0,.35);
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f6f6f3; --bg2: #ffffff; --card: rgba(255,255,255,.85); --card2: #ffffff;
+  --border: rgba(11,11,11,.10); --ink: #0b0b0b; --ink2: #4a4945; --muted: #7a7873;
+  --grid: rgba(11,11,11,.09); --axis: rgba(11,11,11,.25);
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --adaptive: #0b0b0b;
+  --l0: #a9caf3; --l1: #86b6ef; --l2: #5598e7; --l3: #2a78d6; --l4: #1c5cab; --l5: #104281; --l6: #0a2b57; --neutral: #b3b1aa;
+  --bad: #c62f2f; --good: #0b7d3a; --warn: #9a6a00; --on-l4: #ffffff; --on-neutral: #0b0b0b;
+  --glow1: rgba(42,120,214,.16); --glow2: rgba(27,175,122,.14);
+  --shadow: 0 10px 30px rgba(20,20,10,.10);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --bg: #f6f6f3; --bg2: #ffffff; --card: rgba(255,255,255,.85); --card2: #ffffff;
+    --border: rgba(11,11,11,.10); --ink: #0b0b0b; --ink2: #4a4945; --muted: #7a7873;
+    --grid: rgba(11,11,11,.09); --axis: rgba(11,11,11,.25);
+    --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --adaptive: #0b0b0b;
+    --l0: #a9caf3; --l1: #86b6ef; --l2: #5598e7; --l3: #2a78d6; --l4: #1c5cab; --l5: #104281; --l6: #0a2b57; --neutral: #b3b1aa;
+    --bad: #c62f2f; --good: #0b7d3a; --warn: #9a6a00;
+    --glow1: rgba(42,120,214,.16); --glow2: rgba(27,175,122,.14);
+    --shadow: 0 10px 30px rgba(20,20,10,.10);
+  }
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+body::before { content: ""; position: fixed; inset: 0; z-index: -2; pointer-events: none;
+  background:
+    radial-gradient(900px 500px at 12% -8%, var(--glow1), transparent 60%),
+    radial-gradient(800px 480px at 92% 6%, var(--glow2), transparent 60%),
+    var(--bg); }
+body::after { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .55;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 56px 56px; mask-image: radial-gradient(ellipse at 50% 0%, #000 0%, transparent 70%);
+  -webkit-mask-image: radial-gradient(ellipse at 50% 0%, #000 0%, transparent 70%); }
+a { color: inherit; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+nav { position: sticky; top: 0; z-index: 20; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  background: color-mix(in srgb, var(--bg) 72%, transparent); border-bottom: 1px solid var(--border); }
+nav .wrap { display: flex; align-items: center; gap: 18px; height: 56px; }
+.brand { font-weight: 800; letter-spacing: .02em; display: flex; align-items: center; gap: 9px; text-decoration: none; }
+.brand i { width: 22px; height: 22px; border-radius: 7px; background: conic-gradient(from 210deg, var(--s1), var(--s3), var(--s2), var(--s1)); display: inline-block; }
+nav .links { display: flex; gap: 4px; margin-left: auto; overflow-x: auto; scrollbar-width: none; }
+nav .links a { text-decoration: none; color: var(--ink2); font-size: 14px; padding: 7px 11px; border-radius: 9px; white-space: nowrap; }
+nav .links a:hover, nav .links a:focus-visible { color: var(--ink); background: var(--card2); outline: none; }
+button, select { font: inherit; color: var(--ink); cursor: pointer; }
+.iconbtn { width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); display: grid; place-items: center; }
+.iconbtn:hover { background: var(--card2); }
+:focus-visible { outline: 2px solid var(--s1); outline-offset: 2px; }
+
+.hero { padding: 84px 0 40px; text-align: center; }
+.chip { display: inline-flex; gap: 8px; align-items: center; padding: 7px 14px; border: 1px solid var(--border); border-radius: 99px;
+  background: var(--card); color: var(--ink2); font-size: 13px; }
+.chip b { color: var(--ink); font-weight: 600; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 4px color-mix(in srgb, var(--good) 25%, transparent); }
+h1 { font-size: clamp(40px, 7.4vw, 82px); line-height: 1.02; letter-spacing: -.035em; margin: 22px auto 18px; max-width: 16ch; font-weight: 800; }
+.grad { background: linear-gradient(100deg, var(--s1), var(--s3) 55%, var(--s2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.lead { max-width: 60ch; margin: 0 auto; color: var(--ink2); font-size: clamp(17px, 2.2vw, 21px); }
+.cta { display: flex; gap: 12px; justify-content: center; margin-top: 30px; flex-wrap: wrap; }
+.btn { text-decoration: none; padding: 12px 20px; border-radius: 12px; font-weight: 600; border: 1px solid var(--border); background: var(--card); display: inline-flex; gap: 8px; align-items: center; }
+.btn.primary { background: linear-gradient(100deg, var(--s1), var(--s3)); color: #fff; border-color: transparent; box-shadow: 0 8px 28px var(--glow1); }
+.btn:hover { transform: translateY(-1px); }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; margin-top: 54px; text-align: left; }
+.kpi { position: relative; padding: 22px 22px 20px; border-radius: 18px; border: 1px solid var(--border); background: var(--card); overflow: hidden; }
+.kpi::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--accent, var(--s1)); }
+.kpi .num { font-size: clamp(34px, 4.6vw, 46px); font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; line-height: 1.05; }
+.kpi .lbl { color: var(--ink2); font-size: 14px; margin-top: 8px; }
+.kpi .tag { font-size: 11px; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; font-weight: 700; }
+
+section { padding: 72px 0 12px; scroll-margin-top: 60px; }
+.eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--s3); font-weight: 800; }
+h2 { font-size: clamp(28px, 4.4vw, 44px); letter-spacing: -.025em; line-height: 1.08; margin: 10px 0 12px; max-width: 24ch; }
+.sub { color: var(--ink2); max-width: 66ch; font-size: 17px; margin: 0 0 26px; }
+.card { border: 1px solid var(--border); background: var(--card); border-radius: 20px; padding: 22px; box-shadow: var(--shadow); }
+.grid2 { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; }
+.grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+@media (max-width: 860px) { .grid2 { grid-template-columns: 1fr; } }
+@media (max-width: 560px) { .wrap { padding: 0 14px; } .kpis { grid-template-columns: 1fr 1fr; gap: 10px; } .kpi { padding: 16px 14px; } .kpi .num { font-size: 28px; }
+  h1 { font-size: 38px; } .bars { --namew: 128px; } .card { padding: 16px; } .pct { font-size: 40px !important; } }
+html, body { overflow-x: hidden; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.pill { padding: 8px 14px; border-radius: 99px; border: 1px solid var(--border); background: transparent; font-size: 14px; color: var(--ink2); }
+.pill[aria-pressed="true"], .pill[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); font-weight: 600; }
+.pill:hover { background: var(--card2); color: var(--ink); }
+.pill[aria-pressed="true"]:hover, .pill[aria-selected="true"]:hover { background: var(--ink); color: var(--bg); }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 12px; padding: 3px; gap: 2px; background: var(--card); }
+.seg .pill { border: 0; padding: 6px 12px; border-radius: 9px; }
+
+.bars { display: grid; gap: 9px; position: relative; --namew: 196px; }
+.overlay { position: absolute; top: -20px; bottom: 0; left: calc(var(--namew) + 12px); right: 0; pointer-events: none; }
+.overlay .mk { position: absolute; top: 0; bottom: 0; border-left: 2px dashed var(--axis); }
+.overlay .mk span { position: absolute; top: 0; left: 5px; font-size: 11px; color: var(--muted); white-space: nowrap; }
+.outlbl { position: absolute; top: 50%; transform: translateY(-50%); font-weight: 700; font-size: 12.5px; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.row { display: grid; grid-template-columns: var(--namew, 196px) 1fr; gap: 12px; align-items: center; font-size: 14px; }
+.row .name { color: var(--ink2); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .name.hl { color: var(--ink); font-weight: 700; }
+.track { position: relative; height: 26px; border-radius: 8px; background: var(--card); }
+.fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 8px; width: 0; transition: width .9s cubic-bezier(.2,.8,.2,1); display: flex; align-items: center; justify-content: flex-end; padding-right: 9px; color: #fff; font-weight: 700; font-size: 12.5px; font-variant-numeric: tabular-nums; white-space: nowrap; min-width: 8px; }
+.fill.on-l4 { color: var(--on-l4); }
+.fill.on-neutral { color: var(--on-neutral); }
+.mark { position: absolute; top: -4px; bottom: -4px; width: 0; border-left: 2px dashed var(--axis); }
+.mark span { position: absolute; top: -18px; left: 4px; font-size: 11px; color: var(--muted); white-space: nowrap; }
+.note { color: var(--muted); font-size: 13px; margin-top: 12px; }
+.callout { border-left: 3px solid var(--s3); padding: 4px 0 4px 14px; color: var(--ink2); margin: 16px 0 0; }
+.callout b { color: var(--ink); }
+.gauge { display: grid; place-items: center; text-align: center; }
+.gauge .big { font-size: 40px; font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; margin-top: -58px; }
+.gauge .cap { color: var(--ink2); font-size: 13px; margin-top: 2px; }
+svg { display: block; width: 100%; height: auto; overflow: visible; }
+svg text { fill: var(--muted); font-size: 11px; font-family: inherit; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 4px 0 10px; }
+.legend span { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--ink2); }
+.legend i { width: 14px; height: 0; border-top: 3px solid; border-radius: 2px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 4px 0 14px; }
+.controls input[type=range] { flex: 1 1 220px; accent-color: var(--s1); }
+.clock { font-variant-numeric: tabular-nums; color: var(--ink2); min-width: 9ch; text-align: right; }
+.live { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 6px 0 14px; }
+.live > div { border: 1px solid var(--border); border-radius: 14px; padding: 10px 14px; background: var(--card); }
+.live .n { font-size: 12px; color: var(--ink2); display: flex; align-items: center; gap: 7px; }
+.live .v { font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.live .v small { font-size: 12px; color: var(--muted); font-weight: 500; }
+.verdicts { display: grid; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)); gap: 16px; }
+.vcard { position: relative; overflow: hidden; }
+.stamp { position: absolute; top: 16px; right: 16px; border: 2px solid var(--bad); color: var(--bad); border-radius: 8px; padding: 3px 10px; font-weight: 800; letter-spacing: .12em; font-size: 12px; transform: rotate(4deg); }
+.vcard h3 { margin: 0 0 2px; font-size: 15px; color: var(--ink2); text-transform: uppercase; letter-spacing: .08em; }
+.vcard .pct { font-size: 52px; font-weight: 800; letter-spacing: -.035em; color: var(--bad); font-variant-numeric: tabular-nums; }
+.vcard .facts { display: flex; gap: 14px; flex-wrap: wrap; color: var(--ink2); font-size: 13px; margin-top: 12px; }
+.vcard .facts b { color: var(--ink); }
+.lanes { display: grid; gap: 10px; }
+.lane { display: grid; grid-template-columns: 112px 1fr; gap: 12px; align-items: center; font-size: 13px; color: var(--ink2); }
+.lane .bar { position: relative; height: 34px; border-radius: 9px; background: var(--card); overflow: hidden; border: 1px solid var(--border); }
+.lane .slice { position: absolute; top: 0; bottom: 0; }
+.lane.anim .a { background: var(--s1); animation: sliceA 1.6s steps(1) infinite; }
+.lane.anim .b { background: var(--s3); animation: sliceB 1.6s steps(1) infinite; }
+@keyframes sliceA { 0%,49.99% { opacity: 1 } 50%,100% { opacity: .12 } }
+@keyframes sliceB { 0%,49.99% { opacity: .12 } 50%,100% { opacity: 1 } }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.stat { border: 1px solid var(--border); border-radius: 16px; background: var(--card); padding: 18px; }
+.stat .n { font-size: 32px; font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.stat .t { color: var(--ink2); font-size: 14px; margin-top: 4px; }
+.timeline { position: relative; height: 34px; border-radius: 9px; background: var(--card); border: 1px solid var(--border); overflow: hidden; margin-top: 10px; }
+.timeline .seg1 { position: absolute; top: 0; bottom: 0; left: 0; }
+.badges { display: flex; flex-wrap: wrap; gap: 10px; }
+.badge { display: inline-flex; gap: 8px; align-items: center; padding: 9px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); font-size: 14px; }
+.badge svg { width: 16px; height: 16px; flex: none; }
+.honest { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.honest .card { padding: 18px; }
+.honest h4 { margin: 0 0 6px; font-size: 15px; }
+.honest p { margin: 0; color: var(--ink2); font-size: 14px; }
+details { margin-top: 14px; color: var(--ink2); }
+summary { cursor: pointer; font-size: 14px; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; margin-top: 8px; }
+th, td { text-align: right; padding: 5px 9px; border-bottom: 1px solid var(--grid); }
+th:first-child, td:first-child { text-align: left; }
+footer { padding: 60px 0 70px; color: var(--muted); font-size: 14px; text-align: center; }
+.tip { position: fixed; pointer-events: none; z-index: 50; background: var(--bg2); color: var(--ink); border: 1px solid var(--axis); border-radius: 10px; padding: 8px 11px; font-size: 12.5px; box-shadow: var(--shadow); display: none; max-width: 260px; }
+.tip b { font-variant-numeric: tabular-nums; }
+.reveal { opacity: 0; transform: translateY(18px); transition: opacity .7s ease, transform .7s ease; }
+.reveal.in { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .reveal { opacity: 1; transform: none; transition: none; }
+  .fill { transition: none; }
+  .lane.anim .a, .lane.anim .b { animation: none; opacity: .6; }
+}
+.hidden { display: none !important; }
+/* ?static: no motion, for screenshots and social preview images */
+html.static, html.static * { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
+html.static .reveal { opacity: 1; transform: none; }
+</style>
+</head>
+<body>
+<nav aria-label="Sections">
+  <div class="wrap">
+    <a class="brand" href="#top"><i aria-hidden="true"></i>Inferno</a>
+    <div class="links">
+      <a href="#kernel">Kernel</a><a href="#e2e">In vLLM</a><a href="#replay">Live replay</a><a href="#verdict">Verdict</a>
+      <a href="#twist">The twist</a><a href="#more">More findings</a><a href="#method">Method</a><a href="#honest">Limits</a>
+    </div>
+    <button class="iconbtn" id="theme" aria-label="Toggle light and dark theme" title="Toggle theme">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+    </button>
+  </div>
+</nav>
+
+<header class="hero wrap" id="top">
+  <span class="chip"><span class="dot" aria-hidden="true"></span><span id="hwchip"></span></span>
+  <h1>I built an <span class="grad">adaptive LLM serving stack</span> and my hypothesis failed.</h1>
+  <p class="lead">A hand-written CUDA kernel, an MPI router and a load-aware controller, measured end to end with paired statistics. Everything below is real data from one laptop GPU, including the result I did not expect.</p>
+  <div class="cta">
+    <a class="btn primary" href="#replay">Watch the live replay</a>
+    <a class="btn" href="#kernel">Explore the kernel</a>
+  </div>
+  <div class="kpis" id="kpis"></div>
+</header>
+
+<main class="wrap">
+  <section id="kernel" class="reveal">
+    <div class="eyebrow">01 · The kernel</div>
+    <h2 id="kernel-h">A fused int4 kernel that runs at the memory roofline</h2>
+    <p class="sub">Batch-1 decode is memory-bound, so int4 weights should approach the byte ratio (about 3.8× once fp16 scales and zeros are counted) if the kernel saturates DRAM bandwidth. Pick a layer and race the optimization ladder.</p>
+    <div class="grid2">
+      <div class="card">
+        <div class="chips" id="shape-chips" role="group" aria-label="Layer shape"></div>
+        <div class="controls"><div class="seg" role="group" aria-label="Metric">
+          <button class="pill" id="m-speed" aria-pressed="true">Speedup vs fp16 cuBLAS</button>
+          <button class="pill" id="m-time" aria-pressed="false">Time (µs)</button></div>
+          <span class="note" id="kernel-meta" style="margin:0"></span></div>
+        <div class="bars" id="kbars"></div>
+        <p class="callout" id="kernel-callout"></p>
+      </div>
+      <div class="card gauge" id="gauge-card">
+        <svg viewBox="0 0 220 130" role="img" aria-label="Achieved fraction of peak DRAM bandwidth" id="gauge"></svg>
+        <div class="big" id="gauge-num">0%</div>
+        <div class="cap">of theoretical DRAM bandwidth</div>
+        <p class="note" id="gauge-note"></p>
+      </div>
+    </div>
+    <details><summary>Show data table</summary><div id="ktable"></div></details>
+  </section>
+
+  <section id="e2e" class="reveal">
+    <div class="eyebrow">02 · Inside vLLM</div>
+    <h2 id="e2e-h">End to end: at parity with vLLM's default kernel at one sequence, behind with more</h2>
+    <p class="sub" id="e2e-sub"></p>
+    <div class="grid2">
+      <div class="card">
+        <div class="chips" id="e2e-chips" role="group" aria-label="Concurrent sequences"></div>
+        <div class="bars" id="e2e-bars" style="margin-top:14px"></div>
+        <p class="note" id="e2e-note"></p>
+      </div>
+      <div class="card">
+        <h3 style="margin:0 0 8px;font-size:16px">Two claims I had to retract</h3>
+        <p class="callout" style="border-color:var(--warn)"><b>“Beats vLLM's Marlin kernel.”</b> It didn't. My Marlin timing was about 2× too slow and I only caught it because end-to-end tokens/s disagreed with the kernel times. Re-measured in both engine modes, Marlin runs at the bandwidth limit on the big layers.</p>
+        <p class="callout" style="border-color:var(--warn)"><b>“98% of peak bandwidth.”</b> The benchmark let the GPU's L2 cache serve ~6% of the traffic. After a rotation-size sweep the numbers were regenerated and are lower.</p>
+        <p class="note">Both errors are in the audit trail of the technical report.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="replay" class="reveal">
+    <div class="eyebrow">03 · The experiment</div>
+    <h2>Four routing policies, one request stream, replayed live</h2>
+    <p class="sub">Each policy served the identical seeded traffic on the same GPU. Watch p99 latency as load shifts. The black line is the adaptive controller; the strip below shows its decisions.</p>
+    <div class="card">
+      <div class="chips" id="pattern-tabs" role="tablist" aria-label="Load pattern"></div>
+      <div class="controls">
+        <button class="btn" id="play" aria-label="Play or pause the replay">Play</button>
+        <div class="seg" role="group" aria-label="Speed" id="speeds"></div>
+        <input id="scrub" type="range" min="0" max="100" step="0.1" value="0" aria-label="Replay time">
+        <span class="clock" id="clock">0 s</span>
+      </div>
+      <div class="live" id="live"></div>
+      <div class="legend" id="legend"></div>
+      <div id="c-load"></div><div id="c-p99"></div><div id="c-ctl"></div>
+      <p class="note">Latency is measured from each request's scheduled arrival (open loop), so queueing delay is included. Replayed from recorded per-request logs, not simulated.</p>
+    </div>
+  </section>
+
+  <section id="verdict" class="reveal">
+    <div class="eyebrow">04 · The verdict</div>
+    <h2>The adaptive policy lost, on every load pattern</h2>
+    <p class="sub">A pre-registered hypothesis, 8 paired repetitions per cell, the strongest fixed baseline chosen per pattern, Holm-corrected. All eight pairs pointed the same way.</p>
+    <div class="verdicts" id="verdicts"></div>
+    <details><summary>Show all policies and metrics</summary><div id="vtable"></div></details>
+  </section>
+
+  <section id="twist" class="reveal">
+    <div class="eyebrow">05 · The twist</div>
+    <h2 id="twist-h">Why? Two active replicas on one GPU fight each other</h2>
+    <p class="sub" id="twist-sub"></p>
+    <div class="grid2">
+      <div class="card">
+        <div class="lanes" aria-label="Diagram of GPU time slicing">
+          <div class="lane"><span>1 replica</span><div class="bar"><div class="slice" style="left:0;right:0;background:var(--s1)"></div></div></div>
+          <div class="lane"><span>2, one idle</span><div class="bar"><div class="slice" style="left:0;right:0;background:var(--s2)"></div></div></div>
+          <div class="lane anim"><span>2, both active</span><div class="bar">
+            <div class="slice a" style="left:0;width:50%"></div><div class="slice b" style="left:50%;width:50%"></div></div></div>
+        </div>
+        <p class="note">Two processes without GPU partitioning take turns, so each runs smaller batches and the GPU spends time switching. A resident but idle replica takes no GPU time.</p>
+        <div id="c-cont" style="margin-top:14px"></div>
+      </div>
+      <div class="card">
+        <div class="stat" style="border:0;padding:0;background:none"><div class="n" id="cont-big">2.1×</div>
+          <div class="t">p99 latency when the second replica is active, at both light and moderate load</div></div>
+        <p class="callout" id="cont-callout"></p>
+        <p class="callout" style="border-color:var(--s2)" id="cont-impl"></p>
+      </div>
+    </div>
+  </section>
+
+  <section id="more" class="reveal">
+    <div class="eyebrow">06 · More findings</div>
+    <h2>Quantization, batching, and the cost of MPI</h2>
+    <div class="grid3" style="margin-top:18px">
+      <div class="card"><h3 style="margin:0 0 8px;font-size:16px">Quantization sweep</h3><div class="legend" id="sweep-legend"></div>
+        <div id="c-sweep"></div><p class="note" id="sweep-note"></p></div>
+      <div class="card"><h3 style="margin:0 0 8px;font-size:16px">MPI hop latency</h3><div id="c-mpi"></div>
+        <p class="note" id="mpi-note"></p></div>
+      <div class="card"><h3 style="margin:0 0 8px;font-size:16px">Replicas on one GPU</h3><div id="c-scal"></div>
+        <p class="note" id="scal-note"></p></div>
+    </div>
+    <div class="stats" style="margin-top:16px" id="more-stats"></div>
+  </section>
+
+  <section id="method" class="reveal">
+    <div class="eyebrow">07 · Method</div>
+    <h2>Built so the numbers can be trusted</h2>
+    <div class="badges" style="margin-top:18px">
+      <span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="var(--good)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>Kernel checked against a CPU reference before any timing</span>
+      <span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="var(--good)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>Weights rotated past L2 so every launch streams from DRAM</span>
+      <span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="var(--good)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>Open-loop load, latency from scheduled arrival</span>
+      <span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="var(--good)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>Paired seeded streams, Wilcoxon + t-test, Holm-corrected</span>
+      <span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="var(--good)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>Load defined as a fraction of measured capacity</span>
+      <span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="var(--good)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>Every number generated from raw logs by scripts</span>
+    </div>
+  </section>
+
+  <section id="honest" class="reveal">
+    <div class="eyebrow">08 · Limits</div>
+    <h2>What this does not show</h2>
+    <div class="honest" style="margin-top:18px">
+      <div class="card"><h4>One small GPU</h4><p>Replicas shared a single 8 GB laptop GPU. The adaptive idea is untested where each replica has its own device (cloud configs are written, not run).</p></div>
+      <div class="card"><h4>Parity, not a win</h4><p>Inside vLLM the kernel matches the default Marlin path at one sequence and is slower from four. Marlin is at the bandwidth limit on the large layers, so there is no headroom to beat it at batch 1 on this GPU.</p></div>
+      <div class="card"><h4>Causes are hypotheses</h4><p>Why v5/v6 fixed the K=1536 slowdown (staging phase or lane imbalance) is not confirmed: GPU performance counters are blocked by a Windows driver setting, so Nsight cannot run.</p></div>
+      <div class="card"><h4>Small samples</h4><p>4 to 8 repetitions per cell: enough for large effects, not for differences near 1%.</p></div>
+    </div>
+  </section>
+</main>
+<footer><div class="wrap">Built with CUDA, MPI, vLLM and a lot of skepticism. Data files, code and reports are in the repository (<code>docs/FINDINGS.md</code>).</div></footer>
+<div class="tip" id="tip" role="tooltip"></div>
+
+<script>
+const D = {"hw":{"gpu":"NVIDIA GeForce RTX 4060 Laptop GPU","vllm":"0.11.0","torch":"2.8.0","mem_mib":"8188"},"kernel":{"device":"NVIDIA GeForce RTX 4060 Laptop GPU","peak":256.0,"stream":251.6,"runs":5,"shapes":[{"name":"qwen1.5B_qkv","N":2048,"K":1536,"bytes":1671168,"ceil":3.7528981086028064,"kernels":[{"k":"cublas_fp16","us":28.877,"pct":85.20513730650691,"gbps":218.1251515046577,"spread":2.3409633964746974,"ok":true},{"k":"unfused_naive","us":61.5,"pct":90.58203125000001,"gbps":231.89000000000004,"spread":5.46178861788617,"ok":true},{"k":"int4_v0_naive","us":86.651,"pct":7.56640625,"gbps":19.37,"spread":7.846418391016829,"ok":true},{"k":"int4_v1_warp","us":14.582,"pct":44.95680649730833,"gbps":115.08942463310932,"spread":34.93347963242354,"ok":true},{"k":"int4_v2_vec","us":14.623,"pct":44.833421931631676,"gbps":114.7735601449771,"spread":47.350064966149226,"ok":true},{"k":"int4_v3_pad","us":14.828,"pct":44.216266575482194,"gbps":113.19364243323442,"spread":12.294308065821411,"ok":true},{"k":"int4_v4_alg","us":14.725,"pct":44.52427419354839,"gbps":113.98214193548388,"spread":55.32088285229203,"ok":true},{"k":"int4_v5_reuse","us":14.5,"pct":45.21540086206896,"gbps":115.75142620689654,"spread":41.80689655172415,"ok":true},{"k":"int4_v6_lane16","us":13.885,"pct":47.2161505221462,"gbps":120.87334533669427,"spread":74.18797263233705,"ok":true}]},{"name":"qwen1.5B_o_proj","N":1536,"K":1536,"bytes":1253376,"ceil":3.7512195121951217,"kernels":[{"k":"cublas_fp16","us":24.084,"pct":76.62890625,"gbps":196.17,"spread":2.723800033217069,"ok":true},{"k":"unfused_naive","us":44.913,"pct":93.03515625,"gbps":238.17,"spread":0.40968093870371053,"ok":true},{"k":"int4_v0_naive","us":81.674,"pct":6.023437499999999,"gbps":15.419999999999998,"spread":0.1763106986311326,"ok":true},{"k":"int4_v1_warp","us":13.681,"pct":35.96376132958118,"gbps":92.06722900372782,"spread":3.8886046341641696,"ok":true},{"k":"int4_v2_vec","us":14.09,"pct":34.916631919801276,"gbps":89.38657771469127,"spread":12.533711852377573,"ok":true},{"k":"int4_v3_pad","us":13.783,"pct":35.69788416890373,"gbps":91.38658347239354,"spread":5.20206050932307,"ok":true},{"k":"int4_v4_alg","us":13.885,"pct":35.43200846236946,"gbps":90.70594166366583,"spread":4.746128916096511,"ok":true},{"k":"int4_v5_reuse","us":11.981,"pct":41.06292189195393,"gbps":105.12108004340206,"spread":9.022619146982734,"ok":true},{"k":"int4_v6_lane16","us":11.156,"pct":44.10089371750628,"gbps":112.89828791681607,"spread":5.1721046970240225,"ok":true}]},{"name":"qwen1.5B_gate_up","N":17920,"K":1536,"bytes":14622720,"ceil":3.757368347534572,"kernels":[{"k":"cublas_fp16","us":221.696,"pct":97.06640625,"gbps":248.49,"spread":0.3346925519630569,"ok":true},{"k":"unfused_naive","us":614.973,"pct":79.2469070542528,"gbps":202.87208205888717,"spread":0.1066713497990886,"ok":true},{"k":"int4_v0_naive","us":202.281,"pct":28.31480353289483,"gbps":72.48589704421077,"spread":0.3524799659879189,"ok":true},{"k":"int4_v1_warp","us":70.124,"pct":81.67358725703752,"gbps":209.08438337801607,"spread":0.11693571387828397,"ok":true},{"k":"int4_v2_vec","us":75.059,"pct":76.30270229086453,"gbps":195.3349178646132,"spread":0.16387108807738535,"ok":true},{"k":"int4_v3_pad","us":68.193,"pct":83.98547252833869,"gbps":215.00280967254704,"spread":0.24049389233499258,"ok":true},{"k":"int4_v4_alg","us":79.933,"pct":71.64840553963944,"gbps":183.41991818147696,"spread":0.1526278258041108,"ok":true},{"k":"int4_v5_reuse","us":64.778,"pct":88.41383232685092,"gbps":226.33941075673837,"spread":0.5325882243971701,"ok":true},{"k":"int4_v6_lane16","us":61.46,"pct":93.184936404267,"gbps":238.55343719492353,"spread":1.0657338106085277,"ok":true}]},{"name":"qwen1.5B_down","N":1536,"K":8960,"bytes":7311360,"ceil":3.756790726904546,"kernels":[{"k":"cublas_fp16","us":113.398,"pct":94.8880915765159,"gbps":242.9135144358807,"spread":0.2883648741600365,"ok":true},{"k":"unfused_naive","us":269.046,"pct":90.57421875,"gbps":231.87,"spread":0.12191223805593636,"ok":true},{"k":"int4_v0_naive","us":704.43,"pct":4.06558076543269,"gbps":10.407886759507688,"spread":0.05522195250060475,"ok":true},{"k":"int4_v1_warp","us":41.86,"pct":68.421875,"gbps":175.16,"spread":12.183468705207838,"ok":true},{"k":"int4_v2_vec","us":41.962,"pct":68.2564848478981,"gbps":174.7366012106191,"spread":0.5361994185215229,"ok":true},{"k":"int4_v3_pad","us":39.608,"pct":72.3125,"gbps":185.12,"spread":0.674106241163409,"ok":true},{"k":"int4_v4_alg","us":48.21,"pct":59.409856940987346,"gbps":152.0892337689276,"spread":0.13690105787180126,"ok":true},{"k":"int4_v5_reuse","us":33.523,"pct":85.43847461071502,"gbps":218.72249500343045,"spread":0.24460817945888116,"ok":true},{"k":"int4_v6_lane16","us":33.028,"pct":86.72088774581418,"gbps":222.0054726292843,"spread":0.3088288724718538,"ok":true}]},{"name":"llama7B_attn_proj","N":4096,"K":4096,"bytes":8912896,"ceil":3.759633027522936,"kernels":[{"k":"cublas_fp16","us":136.52,"pct":96.05507563566691,"gbps":245.9009936273073,"spread":0.09009668912979082,"ok":true},{"k":"unfused_naive","us":350.392,"pct":84.76774717673348,"gbps":217.0054327724377,"spread":0.10959154318590542,"ok":true},{"k":"int4_v0_naive","us":486.257,"pct":7.173379412789946,"gbps":18.36385129674226,"spread":0.04195312355400698,"ok":true},{"k":"int4_v1_warp","us":45.24,"pct":77.09765624999999,"gbps":197.36999999999998,"spread":1.5760389036251126,"ok":true},{"k":"int4_v2_vec","us":46.264,"pct":75.39437555388638,"gbps":193.0096014179491,"spread":1.8156666090264488,"ok":true},{"k":"int4_v3_pad","us":41.917,"pct":83.21074496922489,"gbps":213.01950712121572,"spread":4.239330104730779,"ok":true},{"k":"int4_v4_alg","us":41.492,"pct":84.06595228447654,"gbps":215.20883784825992,"spread":11.006941097078958,"ok":true},{"k":"int4_v5_reuse","us":38.868,"pct":89.73907279124217,"gbps":229.73202634557992,"spread":14.33312750849027,"ok":true},{"k":"int4_v6_lane16","us":38.851,"pct":89.77671152689119,"gbps":229.82838150884146,"spread":16.44487915368973,"ok":true}]},{"name":"llama7B_mlp_up","N":11008,"K":4096,"bytes":23953408,"ceil":3.761223662019939,"kernels":[{"k":"cublas_fp16","us":361.267,"pct":97.53775899300241,"gbps":249.69666302208617,"spread":0.16442132826967149,"ok":true},{"k":"unfused_naive","us":1042.406,"pct":76.57123568351129,"gbps":196.02236334978892,"spread":0.12403996139698857,"ok":true},{"k":"int4_v0_naive","us":971.036,"pct":9.649073418750696,"gbps":24.701627952001783,"spread":0.02533376723416855,"ok":true},{"k":"int4_v1_warp","us":110.056,"pct":85.12747359866795,"gbps":217.92633241258994,"spread":0.08904557679726592,"ok":true},{"k":"int4_v2_vec","us":113.172,"pct":82.78055322457189,"gbps":211.91821625490402,"spread":0.1988124271021176,"ok":true},{"k":"int4_v3_pad","us":101.315,"pct":92.47108592323447,"gbps":236.72597996348026,"spread":0.07994867492474271,"ok":true},{"k":"int4_v4_alg","us":101.171,"pct":92.60001136689368,"gbps":237.0560290992478,"spread":0.10081940477014545,"ok":true},{"k":"int4_v5_reuse","us":98.322,"pct":95.28522688843799,"gbps":243.93018083440126,"spread":0.6722808730497766,"ok":true},{"k":"int4_v6_lane16","us":98.509,"pct":95.10546875,"gbps":243.47,"spread":0.08324112517637336,"ok":true}]}],"lib":{"marlin":{"qkv":10.270999999978812,"o_proj":8.351999999998952,"gate_up":60.09399999999732,"down":31.77499999999418},"awq":{"qkv":12.223499999992782,"o_proj":11.360999999989872,"gate_up":72.26300000000265,"down":41.92349999999715},"inferno":{"qkv":10.239999999990687,"o_proj":8.03200000000652,"gate_up":69.85700000000361,"down":37.05599999999686}},"maxerr":0.0004346},"e2e":{"concurrency":[1,2,4,8],"reference":"awq_marlin","agreement":{"inferno_b8 vs awq_classic":{"tokens":256,"identical_prefix":256,"identical_total":1},"inferno_b8 vs awq_marlin":{"tokens":256,"identical_prefix":256,"identical_total":1},"inferno_b2 vs awq_classic":{"tokens":256,"identical_prefix":256,"identical_total":1},"inferno_b2 vs awq_marlin":{"tokens":256,"identical_prefix":256,"identical_total":1},"awq_classic vs awq_marlin (stock vs stock)":{"tokens":256,"identical_prefix":256,"identical_total":1}},"configs":{"fp16":{"label":"fp16 (no quantization)","n":3,"by":{"1":{"mean":67.18625858570067,"ci":0.3164017256962375,"ratio":0.4706647505280756},"2":{"mean":132.30342070292423,"ci":2.032516827298329,"ratio":0.47254180634401327},"4":{"mean":262.97155285940204,"ci":2.68139721509344,"ratio":0.48034822122665227},"8":{"mean":515.1043776111093,"ci":11.216924037720997,"ratio":0.48581596302176683}},"layer_check":null},"awq_classic":{"label":"AWQ-int4, vLLM classic kernel","n":3,"by":{"1":{"mean":136.17034956545908,"ci":4.030394265876335,"ratio":0.953904604617034},"2":{"mean":264.3735738911727,"ci":7.68492164751347,"ratio":0.9442287446265191},"4":{"mean":515.8634672882135,"ci":8.198372554094016,"ratio":0.9423080949545536},"8":{"mean":967.9420579499065,"ci":36.4746876251994,"ratio":0.9128849413768956}},"layer_check":null},"awq_marlin":{"label":"AWQ-int4, vLLM Marlin (default)","n":3,"by":{"1":{"mean":142.75345293640328,"ci":2.4841894601094707,"ratio":1.0},"2":{"mean":279.9994894768758,"ci":4.832567612428798,"ratio":1.0},"4":{"mean":547.4651391299398,"ci":6.777975767738075,"ratio":1.0},"8":{"mean":1060.295011570195,"ci":5.935741581477626,"ratio":1.0}},"layer_check":null},"inferno_b2":{"label":"AWQ-int4, custom kernel (<= 2 tokens)","n":3,"by":{"1":{"mean":142.93087915492438,"ci":2.2092664795475487,"ratio":1.0012536395747647},"2":{"mean":268.33168540764706,"ci":11.43546655311684,"ratio":0.9583018203403245},"4":{"mean":512.121881089692,"ci":18.45378211531178,"ratio":0.9354923359244621},"8":{"mean":954.0000660645755,"ci":67.59212990660383,"ratio":0.8997682014506404}},"layer_check":{"n_layers_checked":112,"max_rel_err":0.0010834236163645983}},"inferno_b8":{"label":"AWQ-int4, custom kernel (<= 8 tokens)","n":3,"by":{"1":{"mean":144.13344989199575,"ci":1.6809977681433148,"ratio":1.009700241445304},"2":{"mean":271.9703169125609,"ci":6.666002534036141,"ratio":0.9713980867310624},"4":{"mean":370.34390629331375,"ci":2.293389645745527,"ratio":0.6764869638280304},"8":{"mean":471.63906680502413,"ci":5.919472711252107,"ratio":0.4448223827676969}},"layer_check":{"n_layers_checked":112,"max_rel_err":0.0010834236163645983}}}},"headroom":{"single_fixed_tier":"fixed-bulk","worst_case_regret":{"fixed-fast":1.7582760917659779,"fixed-bulk":1.0336398034678789},"rows":[{"pattern":"bursty","p99_fast":20.116379424516893,"p99_bulk":11.440967387728282,"oracle_tier":"fixed-bulk","oracle_p99":11.440967387728282,"static_lb_p99":24.243886024382007,"adaptive_p99":24.29357666448235,"single_fixed_regret":0.0,"oracle_gain_vs_single_pct":0.0,"adaptive_vs_oracle_pct":112.33848363679395},{"pattern":"mixed_length","p99_fast":5.928559600000559,"p99_bulk":6.127995179792185,"oracle_tier":"fixed-fast","oracle_p99":5.928559600000559,"static_lb_p99":17.626939493873117,"adaptive_p99":18.039625591396582,"single_fixed_regret":0.03363980346787887,"oracle_gain_vs_single_pct":3.2544996192113373,"adaptive_vs_oracle_pct":204.28344840110708},{"pattern":"steady","p99_fast":7.979778418532938,"p99_bulk":6.176759790197691,"oracle_tier":"fixed-bulk","oracle_p99":6.176759790197691,"static_lb_p99":18.597043403489664,"adaptive_p99":18.23751029468732,"single_fixed_regret":0.0,"oracle_gain_vs_single_pct":0.0,"adaptive_vs_oracle_pct":195.2601511820102}],"max_headroom_pct":3.2544996192113373},"campaign":{"patterns":["steady","bursty","mixed_length"],"policies":["fixed-fast","fixed-bulk","static-lb","adaptive"],"cells":{"bursty":{"adaptive":{"p99":24.29357666448235,"p99_ci":1.3865929949240012,"p50":8.536232963335781,"p50_ci":0.5177520488513316,"thr":1339.0114598745108,"thr_ci":37.091798134686314,"tpj":16.347639276421628,"tpj_ci":0.4399820971021633,"good":2.972491786023421,"good_ci":0.16673123468370177,"n":8},"fixed-bulk":{"p99":11.440967387728282,"p99_ci":0.20319320126136198,"p50":4.058895811983454,"p50_ci":0.18352418066953802,"thr":1418.9391349068649,"thr_ci":45.34559104393065,"tpj":18.164956525949314,"tpj_ci":0.5377435539207625,"good":3.8134215095365804,"good_ci":0.08925494281126323,"n":8},"fixed-fast":{"p99":20.116379424516893,"p99_ci":1.5695974872688367,"p50":12.304565347200453,"p50_ci":2.2033199532011505,"thr":1284.8514621792153,"thr_ci":42.00431719562107,"tpj":16.21895741939284,"tpj_ci":0.4671591470626426,"good":0.10052806884675422,"good_ci":0.1483221776874487,"n":8},"static-lb":{"p99":24.243886024382007,"p99_ci":1.5360388761341142,"p50":8.526167469557794,"p50_ci":0.3538127715374344,"thr":1348.4649434597368,"thr_ci":46.41815812462755,"tpj":16.476637119247606,"tpj_ci":0.5503944415113748,"good":3.002028011235507,"good_ci":0.10719679563523865,"n":8}},"mixed_length":{"adaptive":{"p99":18.039625591396582,"p99_ci":0.9081586836910489,"p50":4.196884368281555,"p50_ci":0.16005774235785797,"thr":1349.4035736316641,"thr_ci":36.53523884731908,"tpj":16.794830980789847,"tpj_ci":0.4453870890397198,"good":7.490440472847497,"good_ci":0.2609036929778661,"n":8},"fixed-bulk":{"p99":6.127995179792185,"p99_ci":0.15200086783961542,"p50":1.5985242845698777,"p50_ci":0.05538604012880444,"thr":1424.8660818799653,"thr_ci":39.237826104578744,"tpj":18.193838084928643,"tpj_ci":0.5051497878160696,"good":7.9110423959516964,"good_ci":0.2794077069593883,"n":8},"fixed-fast":{"p99":5.928559600000559,"p99_ci":0.35601113703395537,"p50":2.0524889537791564,"p50_ci":0.24716415403452097,"thr":1411.2155600355227,"thr_ci":33.80588128023828,"tpj":17.922773518959836,"tpj_ci":0.4382298560199551,"good":4.443555315717337,"good_ci":0.9520692026132629,"n":8},"static-lb":{"p99":17.626939493873117,"p99_ci":0.8320248353578066,"p50":4.251510817124776,"p50_ci":0.16496036974026573,"thr":1345.4509168042302,"thr_ci":33.5066103348322,"tpj":16.741324198224916,"tpj_ci":0.4211132230006207,"good":7.469116839259229,"good_ci":0.2617901269486076,"n":8}},"steady":{"adaptive":{"p99":18.23751029468732,"p99_ci":1.270193279858855,"p50":6.7802830518148225,"p50_ci":0.3113554745014566,"thr":1490.8466317125888,"thr_ci":37.123087190703245,"tpj":18.363576227300364,"tpj_ci":0.4814152404183645,"good":5.331792828453179,"good_ci":0.14966439441725843,"n":8},"fixed-bulk":{"p99":6.176759790197691,"p99_ci":0.43238085462775366,"p50":2.6786050500287892,"p50_ci":0.09804974924363918,"thr":1582.6423948585523,"thr_ci":37.64962019263953,"tpj":19.94330530885041,"tpj_ci":0.5109860644542259,"good":5.660265111108165,"good_ci":0.1586231367656863,"n":8},"fixed-fast":{"p99":7.979778418532938,"p99_ci":1.168488549637237,"p50":4.217613040293486,"p50_ci":0.9156282110953387,"thr":1548.5936916790542,"thr_ci":28.16316836968508,"tpj":19.55790468142057,"tpj_ci":0.40076707631269315,"good":1.4092732539096682,"good_ci":0.8825192514006482,"n":8},"static-lb":{"p99":18.597043403489664,"p99_ci":1.4459800540794951,"p50":6.928882897148522,"p50_ci":0.32251008356766775,"thr":1487.7303380102944,"thr_ci":34.14885199057335,"tpj":18.324642207586365,"tpj_ci":0.4142138397016488,"good":5.320937373433833,"good_ci":0.14873307181512097,"n":8}}},"h1":[{"pattern":"bursty","best_fixed":"fixed-bulk","n_pairs":8,"treatment_mean":24.2935766645,"fixed_mean":11.4409673877,"pct_change":112.3384836368,"p_holm":0.0234375,"cohens_dz":8.2187413989,"throughput_ratio":0.943670822,"verdict":"adaptive WORSE: p99 +112.3% (Holm p=0.0234)"},{"pattern":"mixed_length","best_fixed":"fixed-fast","n_pairs":8,"treatment_mean":18.0396255914,"fixed_mean":5.9285596,"pct_change":204.2834484011,"p_holm":0.0234375,"cohens_dz":11.9603247276,"throughput_ratio":0.9561994722,"verdict":"adaptive WORSE: p99 +204.3% (Holm p=0.0234)"},{"pattern":"steady","best_fixed":"fixed-bulk","n_pairs":8,"treatment_mean":18.2375102947,"fixed_mean":6.1767597902,"pct_change":195.260151182,"p_holm":0.0234375,"cohens_dz":9.9819081651,"throughput_ratio":0.9419984177,"verdict":"adaptive WORSE: p99 +195.3% (Holm p=0.0234)"}]},"contention":{"cells":[{"pattern":"rho0.3","config":"single","n":5,"e2e_p99":4.456803310142717,"e2e_p99_ci":0.1252646353091844,"throughput_tok_per_s":828.1763543644323,"tokens_per_joule":10.85874695855751},{"pattern":"rho0.3","config":"split-active","n":5,"e2e_p99":9.251958009240079,"e2e_p99_ci":0.17095248753575198,"throughput_tok_per_s":792.0477045534114,"tokens_per_joule":10.060235912442508},{"pattern":"rho0.3","config":"split-idle","n":5,"e2e_p99":4.490260933280498,"e2e_p99_ci":0.14556692677323912,"throughput_tok_per_s":827.773257052629,"tokens_per_joule":10.935873957543418},{"pattern":"rho0.6","config":"single","n":5,"e2e_p99":6.207031547987005,"e2e_p99_ci":0.6022880416645293,"throughput_tok_per_s":1595.4714239866344,"tokens_per_joule":20.016272413387913},{"pattern":"rho0.6","config":"split-active","n":5,"e2e_p99":13.016520704558895,"e2e_p99_ci":0.7924322789594545,"throughput_tok_per_s":1504.8718363581588,"tokens_per_joule":18.216991129042878},{"pattern":"rho0.6","config":"split-idle","n":5,"e2e_p99":6.2604480976189185,"e2e_p99_ci":0.6707106093679114,"throughput_tok_per_s":1594.9836493538355,"tokens_per_joule":20.06589759285551}],"comps":[{"pattern":"rho0.3","comparison":"split-idle vs single","metric":"e2e_p99","ratio_a_over_b":1.007507089904919,"n_pairs":5},{"pattern":"rho0.3","comparison":"split-idle vs single","metric":"throughput_tok_per_s","ratio_a_over_b":0.9995132711653997,"n_pairs":5},{"pattern":"rho0.3","comparison":"split-idle vs single","metric":"tokens_per_joule","ratio_a_over_b":1.007102753133512,"n_pairs":5},{"pattern":"rho0.3","comparison":"split-active vs split-idle","metric":"e2e_p99","ratio_a_over_b":2.060449970884159,"n_pairs":5},{"pattern":"rho0.3","comparison":"split-active vs split-idle","metric":"throughput_tok_per_s","ratio_a_over_b":0.9568413787292163,"n_pairs":5},{"pattern":"rho0.3","comparison":"split-active vs split-idle","metric":"tokens_per_joule","ratio_a_over_b":0.9199297606665532,"n_pairs":5},{"pattern":"rho0.6","comparison":"split-idle vs single","metric":"e2e_p99","ratio_a_over_b":1.0086058124916792,"n_pairs":5},{"pattern":"rho0.6","comparison":"split-idle vs single","metric":"throughput_tok_per_s","ratio_a_over_b":0.9996942755442275,"n_pairs":5},{"pattern":"rho0.6","comparison":"split-idle vs single","metric":"tokens_per_joule","ratio_a_over_b":1.002479241810998,"n_pairs":5},{"pattern":"rho0.6","comparison":"split-active vs split-idle","metric":"e2e_p99","ratio_a_over_b":2.0791675773990623,"n_pairs":5},{"pattern":"rho0.6","comparison":"split-active vs split-idle","metric":"throughput_tok_per_s","ratio_a_over_b":0.9435029863583975,"n_pairs":5},{"pattern":"rho0.6","comparison":"split-active vs split-idle","metric":"tokens_per_joule","ratio_a_over_b":0.9078582727108635,"n_pairs":5}]},"sweep":[{"config":"fp16-bs1","quant":"fp16","bs":1,"cold":200.123376931,"thr":0.0,"thr_ci":0.0,"tpj":0.0,"tpj_ci":0.0,"p50":null,"p50_ci":0.0,"done":0.0,"done_ci":0.0},{"config":"fp16-bs32","quant":"fp16","bs":32,"cold":45.45536201900018,"thr":1385.0039127417624,"thr_ci":54.61743802871956,"tpj":16.905061782007397,"tpj_ci":0.7765101183860885,"p50":9.252864116964064,"p50_ci":2.868118796628849,"done":1.0,"done_ci":0.0},{"config":"fp16-bs64","quant":"fp16","bs":64,"cold":47.4784256869998,"thr":1491.4631319986945,"thr_ci":68.11748374982221,"tpj":17.856030724171323,"tpj_ci":0.8494873964106944,"p50":5.456630274835582,"p50_ci":0.15298934083038684,"done":1.0,"done_ci":0.0},{"config":"fp16-bs8","quant":"fp16","bs":8,"cold":48.50102984199998,"thr":375.9590804885074,"thr_ci":20.692782777426487,"tpj":5.005239957911047,"tpj_ci":0.2879673884175631,"p50":61.676096359565214,"p50_ci":8.039903839851696,"done":0.43630768414170146,"done_ci":0.05497473371885886},{"config":"int4-bs1","quant":"int4","bs":1,"cold":49.489389905999815,"thr":4.624379183988014,"thr_ci":13.101287391616781,"tpj":0.062228593686466806,"tpj_ci":0.17716641591253046,"p50":119.67682576458455,"p50_ci":20.412487680270374,"done":0.005783794999481274,"done_ci":0.01947354880362937},{"config":"int4-bs32","quant":"int4","bs":32,"cold":47.47697061400049,"thr":1588.778106627066,"thr_ci":67.66589750989647,"tpj":19.893009026453964,"tpj_ci":0.9542572781092638,"p50":2.5936898886697803,"p50_ci":0.08462773794686029,"done":1.0,"done_ci":0.0},{"config":"int4-bs64","quant":"int4","bs":64,"cold":47.465151570999296,"thr":1588.5131866881113,"thr_ci":68.77189472076361,"tpj":19.941754266062365,"tpj_ci":1.1425769450428653,"p50":2.616920340004288,"p50_ci":0.09469064534285732,"done":1.0,"done_ci":0.0},{"config":"int4-bs8","quant":"int4","bs":8,"cold":47.483439676000216,"thr":884.7492544557111,"thr_ci":16.715400397201506,"tpj":12.519960498531669,"tpj_ci":0.15071052974064614,"p50":33.826298493923964,"p50_ci":8.239797651352452,"done":0.9991830065359477,"done_ci":0.003515239158291994},{"config":"int8-bs1","quant":"int8","bs":1,"cold":150.5309145190001,"thr":0.0,"thr_ci":0.0,"tpj":0.0,"tpj_ci":0.0,"p50":null,"p50_ci":0.0,"done":0.0,"done_ci":0.0},{"config":"int8-bs32","quant":"int8","bs":32,"cold":52.53042053199988,"thr":1554.1055306480612,"thr_ci":67.71794320193749,"tpj":18.843659085201363,"tpj_ci":0.7884579360320991,"p50":3.578780734056835,"p50_ci":0.21166381916474464,"done":1.0,"done_ci":0.0},{"config":"int8-bs64","quant":"int8","bs":64,"cold":49.52375215600023,"thr":1553.239267191356,"thr_ci":66.5580982148424,"tpj":18.83145257030346,"tpj_ci":0.9585992203946994,"p50":3.572847833829504,"p50_ci":0.12321242171102664,"done":1.0,"done_ci":0.0},{"config":"int8-bs8","quant":"int8","bs":8,"cold":51.51716799199994,"thr":627.0902297022111,"thr_ci":11.232730764965254,"tpj":8.377588348677051,"tpj_ci":0.16038802223424042,"p50":46.20736545860672,"p50_ci":12.586149610634351,"done":0.7222345872026675,"done_ci":0.022929302909073357}],"mpi":{"pingpong":[{"bytes":64,"rtt_us_p50":3.7224999998031194,"rtt_us_p99":12.265600001093413,"one_way_us_est":1.8612499999015597},{"bytes":512,"rtt_us_p50":4.39899999982174,"rtt_us_p99":24.463349999646052,"one_way_us_est":2.19949999991087},{"bytes":4096,"rtt_us_p50":9.475000000591649,"rtt_us_p99":31.63738000010241,"one_way_us_est":4.7375000002958245},{"bytes":32768,"rtt_us_p50":25.476499999399493,"rtt_us_p99":65.45933000065672,"one_way_us_est":12.738249999699747},{"bytes":262144,"rtt_us_p50":753.868000000324,"rtt_us_p99":1346.9630799995791,"one_way_us_est":376.934000000162}],"dispatch":[{"workers":1,"jobs":20000,"payload_bytes":512,"window":64,"jobs_per_s":186314.35714774072,"rtt_us_p50":322.01649999930027,"rtt_us_p99":609.073339999675},{"workers":2,"jobs":20000,"payload_bytes":512,"window":64,"jobs_per_s":169524.70916722502,"rtt_us_p50":339.4534999987542,"rtt_us_p99":974.6870499994031},{"workers":4,"jobs":20000,"payload_bytes":512,"window":64,"jobs_per_s":161832.13002648865,"rtt_us_p50":336.7754999992201,"rtt_us_p99":1059.9995300013254},{"workers":8,"jobs":20000,"payload_bytes":512,"window":64,"jobs_per_s":123287.35372571684,"rtt_us_p50":419.75599999943825,"rtt_us_p99":1203.9017800001513},{"workers":15,"jobs":20000,"payload_bytes":512,"window":64,"jobs_per_s":49653.86686638385,"rtt_us_p50":764.5400000004798,"rtt_us_p99":11960.193109999542}],"cores":16,"scaling":{"cells":[{"router":"http","replicas":1,"n":4,"throughput":2105.6116136222654,"throughput_ci":31.009624929199163,"p99":74.02994930818106,"p99_ci":7.119865308718943,"errors":0,"efficiency_vs_1x":1.0},{"router":"http","replicas":2,"n":4,"throughput":1980.0258620921588,"throughput_ci":34.945595991730215,"p99":82.23757931684284,"p99_ci":6.628879580654512,"errors":0,"efficiency_vs_1x":0.47017831999082144},{"router":"mpi","replicas":1,"n":4,"throughput":2117.8641579622276,"throughput_ci":30.988264626514137,"p99":73.3159062575066,"p99_ci":7.236537259212653,"errors":0,"efficiency_vs_1x":1.0},{"router":"mpi","replicas":2,"n":4,"throughput":1980.2096083518602,"throughput_ci":28.533460059221397,"p99":82.50331239411655,"p99_ci":8.062146591657665,"errors":0,"efficiency_vs_1x":0.46750156305048}],"mv":[{"replicas":1,"metric":"throughput_tok_per_s","n_pairs":4,"mpi_mean":2117.8641579622276,"http_mean":2105.6116136222654,"pct_diff_mpi_vs_http":0.5818995421897534,"p_ttest":0.046752287567992615,"p_wilcoxon":0.125},{"replicas":1,"metric":"e2e_p99","n_pairs":4,"mpi_mean":73.3159062575066,"http_mean":74.02994930818106,"pct_diff_mpi_vs_http":-0.9645326754202519,"p_ttest":0.047887759961906355,"p_wilcoxon":0.125},{"replicas":2,"metric":"throughput_tok_per_s","n_pairs":4,"mpi_mean":1980.2096083518602,"http_mean":1980.0258620921588,"pct_diff_mpi_vs_http":0.00927999291420284,"p_ttest":0.9452837181296221,"p_wilcoxon":1.0},{"replicas":2,"metric":"e2e_p99","n_pairs":4,"mpi_mean":82.50331239411655,"http_mean":82.23757931684284,"pct_diff_mpi_vs_http":0.3231285252814837,"p_ttest":0.6346684318758997,"p_wilcoxon":1.0}],"overhead":[{"replicas":1,"mpi_dispatch_us_p50":1960.154499997202,"mpi_dispatch_us_p99":18029.80159002116,"mpi_result_us_p50":525.4773749960862,"mpi_result_us_p99":772.1084849961098},{"replicas":2,"mpi_dispatch_us_p50":1891.7310000858834,"mpi_dispatch_us_p99":6338.687577580791,"mpi_result_us_p50":537.5924999952986,"mpi_result_us_p99":820.9328600713658}]}},"replay":{"steady":{"pattern":"steady","rep":0,"t":[0.0,1.0,2.0,3.0,4.0,5.0,6.0,7.0,8.0,9.0,10.0,11.0,12.0,13.0,14.0,15.0,16.0,17.0,18.0,19.0,20.0,21.0,22.0,23.0,24.0,25.0,26.0,27.0,28.0,29.0,30.0,31.0,32.0,33.0,34.0,35.0,36.0,37.0,38.0,39.0,40.0,41.0,42.0,43.0,44.0,45.0,46.0,47.0,48.0,49.0,50.0,51.0,52.0,53.0,54.0,55.0,56.0,57.0,58.0,59.0,60.0,61.0,62.0,63.0,64.0,65.0,66.0,67.0,68.0,69.0,70.0,71.0,72.0,73.0,74.0,75.0,76.0,77.0,78.0,79.0,80.0,81.0,82.0,83.0],"arrivals":[0.0,0.4,1.4,2.8,4.4,6.4,7.8,9.0,8.4,8.2,6.4,6.0,4.8,5.4,5.8,7.2,6.4,6.6,6.8,6.8,6.4,6.6,6.2,6.6,5.4,5.2,5.8,6.2,5.8,6.0,6.0,6.0,5.8,6.0,6.0,6.6,6.4,6.6,5.2,5.8,5.0,4.6,5.6,7.0,6.6,8.6,8.6,7.0,7.0,8.2,6.4,6.8,7.2,6.6,5.2,5.2,4.6,4.4,4.6,5.0,5.2,5.4,5.0,5.2,4.6,4.4,5.4,6.6,6.0,5.6,5.6,4.4,4.0,4.6,5.2,5.6,5.0,3.8,2.2,1.4,0.0,0.0,0.0,0.0],"policies":{"adaptive":{"p99_e2e":[null,null,null,1.724554299854483,2.1202181020598894,2.1160749310803384,3.1952324181775507,5.278826246423124,5.254874443918103,5.230922641413083,6.0082123908961504,7.507318142936675,8.275063942168192,8.275063942168192,8.676800509424368,8.840344004941091,9.184469140968256,11.619976984390814,11.533748672326807,14.359221201175664,14.360525081914075,14.767408602895678,15.702491508340506,15.702491508340506,15.907722984682959,15.904444737443782,15.897888242965426,15.901166490204606,17.092277345390997,17.092284430179607,17.092277345390997,17.092277345390997,17.092220667082135,17.178798541085104,17.193641476186656,17.20848441128821,17.301893885084077,17.300502228981806,17.30606885339089,17.30746050949316,17.30746050949316,17.308852165595436,17.32137707051588,16.6425885950729,17.258897436376497,17.25865357450208,17.3702210126413,17.363305931685776,17.670530439864688,17.668933226645738,17.66733601342679,17.792999748908407,17.846918073782106,18.018298262348043,18.016907599708947,18.01737115392198,18.01968892498714,18.022006696052298,18.022006696052298,18.02293380447836,18.021079587626232,17.94560929499501,17.950808756285188,17.834679912951007,17.834679912951007,17.82957770098478,17.793995674799778,17.793995674799778,17.563526112019368,17.19840853775782,17.220689769619554,16.562915618838254,16.119245092832333,16.119245092832333,15.768194236859362,14.630323750799786,14.630323750799786,14.628285718190442,14.628795226342778,14.629049980418946,14.629559488571282,13.797748589009618,13.424315805666238,13.429858578672007],"throughput_tok_per_s":[0.0,0.0,36.6,183.4,255.8,279.4,475.2,728.4,670.0,633.6,833.4,830.0,836.4,938.8,1099.2,1190.2,1262.8,1257.4,1357.4,1586.2,1547.0,1692.2,1794.2,1660.2,1688.0,1836.2,1919.4,1713.6,2242.4,1953.6,1702.2,1539.4,2329.6,1936.4,1921.6,1779.2,1995.6,1346.4,1379.0,1419.0,1602.4,1275.6,1248.8,1181.8,1387.0,1451.0,1717.8,1840.0,2098.8,1998.0,2135.6,2244.2,2120.2,2029.4,2066.0,1772.4,1488.2,1309.2,1438.2,1415.4,1994.0,1932.6,2082.4,1704.6,1924.2,1855.2,1825.8,1706.0,1768.0,1590.0,1101.0,1530.4,2034.0,1950.2,1788.4,1748.8,1286.4,1383.4,1458.6,1574.2,1775.6,2180.4,1634.2,1403.6],"inflight":[0,2,6,9,15,24,28,34,36,41,37,40,40,43,48,51,48,49,50,54,56,54,52,58,52,51,50,52,50,50,50,51,42,45,45,52,48,49,45,49,48,47,53,57,57,66,60,55,56,61,58,53,52,49,45,46,44,45,44,46,40,40,39,44,39,34,39,44,44,39,38,32,27,32,31,36,32,21,18,13,9,2,0,0]},"fixed-bulk":{"p99_e2e":[null,null,null,1.744612482654495,2.1573369617198024,2.5253918035144567,4.231620779090541,4.20841330946552,4.351865245210929,5.281599620404771,5.799711404341202,6.191667471437144,6.202469209792603,6.205016634346104,6.204916964623358,6.204617955455119,6.2047176251778655,6.204418616009627,6.204219276564134,6.204817294900612,6.2047176251778655,6.204817294900612,6.2000987144966215,5.821229343849239,5.820776241423624,5.821229343849239,5.8221355487004685,5.821229343849239,5.8216824462748535,5.8216824462748535,5.820323138998009,5.765848436064079,5.303328523735923,5.299772028159476,5.296215532583029,5.259770928872387,5.385319721561076,5.389286153027916,5.582313244448794,5.743778190887097,5.743778190887097,5.743652606501511,5.743778190887097,5.743903775272684,5.744280528429441,5.74402935965827,5.743275853344754,5.742773515802409,5.7426479314168235,5.6128411453057785,5.768917453261814,5.768680550418493,5.768206744731851,5.767851390466868,5.767496036201886,5.767851390466868,5.768562098996832,5.768799001840153,5.769509710370118,5.769628161791778,5.4517700999867245,5.452486717993158,5.452665872494766,5.43810263648835,5.03969216388411,4.825830602854358,4.826741299969256,4.8608231836295115,4.915247413145508,5.138300119930873,5.138300119930873,5.137788446595852,5.138811793265894,5.139067629933405,5.138044283263363,5.139323466600915,5.139579303268426,5.138811793265894,5.140090976603447,4.873809990981176,4.902132678963384,4.5390191113144445,4.539422188674002,4.535049103900013],"throughput_tok_per_s":[0.0,0.0,36.6,183.4,255.8,442.6,800.2,847.2,961.2,1351.4,1558.6,1828.0,2075.6,2608.6,2284.8,2195.4,1876.0,1888.8,1577.4,1740.0,1747.8,1839.8,2309.6,2073.0,2023.0,2076.6,1859.2,1464.8,1631.6,1598.8,1690.8,1744.2,1668.0,1543.6,1673.2,1469.6,1620.4,1485.6,1724.4,1941.4,2233.2,2220.0,2085.8,1866.0,1389.8,1101.4,1271.8,1596.2,1853.0,2088.6,2261.0,2080.4,1904.6,1847.4,1996.6,1770.4,1678.8,1937.2,1572.6,1245.2,1285.8,1287.2,1192.6,1508.0,1537.2,1739.0,1648.0,1464.6,1361.2,1663.8,1485.6,1665.8,1564.0,1511.4,1338.2,1305.2,1106.6,1465.2,1373.2,1273.0,1037.8,874.4,414.4,204.8],"inflight":[0,2,6,9,15,20,22,31,30,27,22,20,20,16,22,22,19,20,21,26,25,21,12,18,17,15,18,17,19,19,14,16,17,20,18,22,22,24,18,17,11,9,17,21,23,31,23,18,18,24,21,19,17,15,13,15,12,10,14,16,17,17,13,14,15,11,17,21,18,10,10,7,11,13,11,14,12,5,2,0,0,0,0,0]},"fixed-fast":{"p99_e2e":[null,null,null,1.6237687201077131,2.1928076050199072,2.4509562545337222,4.02700222515805,4.0040994925730296,4.762712403230324,4.762637327353047,5.16786467076359,5.320488087749453,5.3158842308371765,6.478206848376362,6.503311932060313,6.92216442376919,6.930809411885996,6.887584471301958,7.057425240319983,7.045991842328366,7.0631419393157895,7.074575337307406,7.068858638311596,7.203518703333581,7.197010805833817,6.915833892333108,6.915833892333108,7.2437033914752815,7.2524889760795075,7.248096183777396,7.23931059917317,7.251230727791031,7.234454233823772,7.251230727791031,7.32133189219067,7.5632955354759295,7.561857025995547,7.398630369578142,7.402907933642967,7.415740625837445,7.633145091238186,7.639795685209693,7.640038962407179,7.67505164772352,7.674377301000056,7.977184299102785,8.003486353244622,7.990335326173706,7.977184299102785,7.931155704354567,7.93773121789003,7.944306731425484,8.019323712201729,8.086339959135437,8.095257932638404,7.858800189148336,7.93269258369508,8.21797093510787,8.379573220765154,8.41194986482483,8.503888772111413,8.500895623971838,8.500895623971838,8.509875068390556,8.506881920250985,8.515861364669702,8.524840809088419,8.512868216530128,8.242087159585221,8.228626979292272,7.0840509706263095,7.073585303605682,7.078818137115996,7.073585303605682,6.778855226001324,6.574193434905847,6.579386146660866,6.584578858415886,6.584578858415886,6.600156993680945,6.458864949754676,6.080007112469847,5.877710512923564,5.736348221651894],"throughput_tok_per_s":[0.0,0.0,36.6,110.6,255.8,475.2,853.4,912.0,1339.8,1401.6,1685.2,1600.8,1695.8,1792.2,1875.0,1643.8,1644.8,1777.6,1687.8,1671.8,1700.4,1629.2,1591.8,1690.6,1737.6,1733.6,1867.2,1941.8,1582.2,1604.0,1705.2,1631.6,1710.4,1689.4,1642.4,1595.4,1723.0,1617.8,1675.2,1562.4,1794.4,1736.6,1786.0,1949.2,1964.2,1770.4,1611.6,1683.6,1572.2,1917.6,1760.2,1770.6,1695.8,1830.6,1449.4,1684.6,1796.4,1757.4,1650.0,1655.2,1831.6,1723.4,1659.6,1635.6,1847.0,1570.2,1715.6,1887.8,1649.4,1737.8,1727.4,1726.0,1591.8,1764.0,1653.2,1583.0,1496.2,1640.6,1577.2,1425.8,1140.2,874.4,414.4,204.8],"inflight":[0,2,6,11,15,19,21,30,26,30,24,25,26,25,29,32,29,28,28,32,34,34,33,34,30,29,30,30,32,30,29,32,28,32,31,33,32,33,30,34,30,29,33,34,33,40,41,37,39,40,38,40,39,37,37,33,28,27,27,30,27,26,22,25,23,22,26,25,27,20,17,13,14,16,13,15,12,5,2,0,0,0,0,0]},"static-lb":{"p99_e2e":[null,null,null,null,null,3.694860924540934,4.098339486670692,5.31031553340122,5.328584072051214,5.679049741440439,5.6777421083703725,8.043621158165857,8.664070093843314,9.259061443050449,11.230529466514941,11.32793440055403,11.827192369876677,11.827192369876677,11.79380428524762,14.991220389391863,14.97907157738881,15.875007474950458,16.57287248940992,16.721542928410347,17.01870575894655,17.285874570531576,17.280779833374837,17.273137727639735,17.275685096218105,17.82363943356373,17.82344438902512,17.824029522640945,17.82363943356373,17.823249344486513,17.8228592554093,17.82344438902512,17.823834478102338,17.82344438902512,17.82363943356373,17.666583544415417,17.66930244397119,17.666583544415417,17.67338079330485,16.60953697606643,16.702376659143603,17.576521173250097,17.741509281141074,17.709249334426396,18.02986366245701,18.076311341106575,18.072174038632898,18.16414541316194,18.254185746050883,18.279339917657712,18.27750410279667,18.276035450907838,18.277136939824462,18.278238428741087,18.278605591713294,18.27970708062992,18.281542895490958,18.28117573251875,18.086770635982333,17.787671685183284,17.780059745262456,17.787671685183284,17.790208998490225,17.417848368375598,17.020700101268663,17.01733423339504,17.027431837015904,15.633541412219778,15.631297349684635,15.630976769322473,14.812784419823629,14.503394751371216,14.503421417397385,14.503341419318879,14.503368085345048,14.503394751371216,14.503368085345048,14.031419712605128,14.079908283149523,13.650788688982264],"throughput_tok_per_s":[0.0,0.0,0.0,0.0,36.6,161.2,227.2,322.6,475.2,565.2,519.4,746.6,826.2,1017.6,1309.4,1279.0,1407.4,1419.0,1292.2,1332.8,1671.6,1699.4,1862.2,1990.4,1780.0,1686.2,1903.4,1837.8,1783.8,2063.6,2071.0,1742.4,2090.6,2176.8,1930.8,1676.6,1806.6,1673.6,1551.2,1565.4,1730.4,1589.8,1369.0,1364.4,1200.0,1372.8,1485.8,1606.2,1708.0,2005.6,2163.2,2153.4,2323.4,2274.6,2102.8,2015.6,1852.4,1507.6,1654.6,1713.2,1602.4,1839.4,1820.6,1725.6,2070.6,2089.8,1825.6,1697.0,1632.0,1187.6,868.4,1246.2,1705.8,1892.2,1782.8,2114.8,1718.0,1540.8,1398.4,1571.0,1501.4,1763.4,1696.0,1463.8],"inflight":[0,2,7,14,21,27,34,42,42,46,43,44,46,47,49,56,51,54,56,58,58,54,51,56,54,55,52,52,55,51,49,51,47,49,46,53,51,49,47,49,48,45,52,55,58,67,63,59,60,63,57,57,52,51,48,44,42,42,42,43,43,40,39,41,34,33,38,44,43,38,40,35,31,32,33,32,29,24,19,14,10,4,1,0]}},"controller":{"level":[0,0,0,0,0,1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1,1],"events":[{"t":4.002565437000044,"level":1,"reason":"escalate: util0=0.94 ttft_p95=None"},{"t":5.003262120000045,"level":2,"reason":"escalate: util0=0.94 ttft_p95=0.030061255282664356"},{"t":81.09538591700004,"level":1,"reason":"de-escalate: pool_util=0.03"}]}},"bursty":{"pattern":"bursty","rep":0,"t":[0.0,1.0,2.0,3.0,4.0,5.0,6.0,7.0,8.0,9.0,10.0,11.0,12.0,13.0,14.0,15.0,16.0,17.0,18.0,19.0,20.0,21.0,22.0,23.0,24.0,25.0,26.0,27.0,28.0,29.0,30.0,31.0,32.0,33.0,34.0,35.0,36.0,37.0,38.0,39.0,40.0,41.0,42.0,43.0,44.0,45.0,46.0,47.0,48.0,49.0,50.0,51.0,52.0,53.0,54.0,55.0,56.0,57.0,58.0,59.0,60.0,61.0,62.0,63.0,64.0,65.0,66.0,67.0,68.0,69.0,70.0,71.0,72.0,73.0,74.0,75.0,76.0,77.0,78.0,79.0,80.0,81.0,82.0,83.0,84.0,85.0,86.0,87.0],"arrivals":[0.0,2.2,6.4,10.8,12.8,15.6,17.8,16.6,15.6,16.0,16.0,12.8,10.6,8.0,6.6,4.4,3.6,3.0,3.2,2.8,3.0,3.4,4.4,4.2,4.0,3.6,4.0,3.4,3.4,3.8,4.0,3.2,3.2,3.0,2.4,2.4,2.8,2.4,2.6,4.0,4.0,8.0,10.4,13.6,15.0,16.4,14.0,14.2,12.8,11.6,13.2,11.8,9.0,7.2,5.8,2.6,2.6,2.8,3.0,3.6,3.6,3.4,3.6,3.0,2.6,2.6,2.4,2.4,3.8,3.6,4.8,5.2,5.4,4.2,4.4,3.4,2.4,1.8,1.2,0.6,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"policies":{"adaptive":{"p99_e2e":[null,null,null,null,3.083315931239615,3.0803321184640104,5.736071178354659,5.90142859939319,5.898961120337171,7.773424865926653,8.224795875701128,9.868852135074963,9.892335410436713,10.413724087068712,11.116960102878554,11.685358101546546,13.330772000639739,14.352852413515496,15.770695537809393,16.111686884768762,16.14119415758838,17.145155229727433,17.54319767917047,17.54319767917047,21.050603968792828,21.892641725455285,21.911972821505998,22.331281494112122,22.356939880152865,22.662308849859127,23.39282915525189,23.410361225730895,24.24351707539652,25.024061523873815,25.026664740114388,25.02883408698153,25.029267956354957,25.03404051946267,25.034908258209526,25.03577599695638,25.039680821317237,25.040982429437523,25.043151776304665,24.633712671065297,23.944457740410847,19.609825901554178,13.434014251022354,13.432593004472407,11.381796520539192,11.376043454319415,11.691765729881354,12.636501417195856,12.617253282661856,12.591589103283193,13.167217447210147,13.152572299225426,13.941734455870696,14.757097617014892,17.615977609743403,19.800837245162572,20.83262274040596,20.828322806686174,21.051543031541197,21.04327718283688,23.055991773902054,23.320634522969474,23.319356425576387,23.31910080609777,23.319356425576387,23.32012328401224,23.32191262036256,23.347371457420547,23.492837291879326,23.49379643581434,24.52636262766147,24.99662682118326,24.999736236965433,25.000624641474626,25.00284565274761,25.00240145049301,25.00284565274761,25.004622461765994,25.00639927078438,25.007287675293572,25.014394911367116,15.663768773817571,12.196261099442314,12.24078974600137],"throughput_tok_per_s":[0.0,0.0,22.0,22.0,102.8,117.2,334.8,593.0,647.8,834.8,1146.6,1610.8,1577.8,1730.8,1698.2,1733.2,1546.8,1917.0,2140.4,2335.0,2267.8,2230.8,2143.4,2004.4,2145.6,2248.2,2017.6,2205.2,2527.6,2326.8,2543.2,2631.6,2596.8,2603.2,2520.8,2170.8,2182.8,1549.8,1410.2,1294.6,1215.8,1101.0,1361.4,880.0,961.6,936.8,888.0,704.2,943.6,862.8,1023.4,1118.2,1471.4,1451.2,1707.6,1745.8,1800.0,1658.6,1919.6,2059.0,2416.2,2488.2,2584.0,2511.2,2651.2,2240.8,2520.4,2503.0,2673.6,2472.4,2398.2,2147.6,2037.2,1553.8,1903.2,2175.8,2109.2,2080.2,2179.0,1970.2,1705.8,1562.6,1285.4,1092.0,443.8,204.8,0.0,0.0],"inflight":[0,11,31,53,61,74,91,100,115,122,127,120,118,117,116,112,105,96,93,86,84,80,75,74,67,61,62,53,48,47,39,35,27,21,19,19,19,19,16,21,22,43,50,70,78,84,90,99,106,111,120,121,112,112,107,102,100,95,91,87,78,75,71,67,59,55,46,41,42,38,42,41,40,41,28,25,20,15,12,5,2,0,0,0,0,0,0,0]},"fixed-bulk":{"p99_e2e":[null,null,null,null,2.703772801357825,3.865375013435698,5.2722873529642085,5.522142383456717,5.976915230161002,7.585609859554564,8.096331182708438,9.856700544562631,9.854629934936984,10.254105901356109,10.952064461615374,10.948793869052691,11.348400125987107,11.611107075212155,12.23591604504592,12.23518687025825,12.564398384240175,12.565253974535308,12.56482617938774,12.565253974535308,12.567656710763844,12.567958528501194,12.5691657994506,12.57188215908676,12.575805789672325,12.577918513833783,12.496484427652662,12.03165832729648,8.356301624571472,4.4184641162047535,4.418950238692554,4.419922483668156,4.419922483668156,4.386728831217223,4.386733122569737,4.322282014116157,4.197861436227232,4.197934261124258,4.17560130127848,4.1735767701702216,4.17087739535921,4.450618048416114,7.533499557993695,7.527871424913987,7.5208362585643505,8.14165248768651,8.919987240712686,10.05355334442206,11.153443128717422,11.189201202196315,11.592598299427816,11.59365693573052,11.661367669871252,11.659250397265845,11.65644348418652,11.659250397265845,11.657846940726182,11.660653853805506,11.66386602610136,11.664579842167106,11.600198706293865,11.523618334291482,11.299263063849834,11.18386098336212,10.520519544288844,10.447978570129164,8.56073725586963,6.004634972540548,5.3008069101626765,4.853080820709826,4.713245537563896,4.713245537563896,4.712981275114561,4.712849143889894,4.712981275114561,4.713245537563896,4.7137740624625675,4.714302587361238,4.711526937237304,4.682096875415968,4.330737765515835,4.33546511189449,4.21816302621268,null],"throughput_tok_per_s":[0.0,0.0,22.0,60.2,207.2,349.6,614.8,1193.4,1387.4,1793.8,2264.6,2819.6,2764.2,3082.4,3254.6,2819.6,2419.8,2648.2,3157.6,3072.4,3703.6,3897.2,3940.4,3426.8,2926.4,2384.6,1898.0,1407.4,1016.0,1210.0,1126.4,1158.4,1046.4,891.6,637.2,621.0,649.6,704.8,902.0,916.4,828.6,806.8,684.6,598.0,651.4,850.4,1353.8,1511.4,1714.6,2255.4,2237.2,2036.4,2718.6,2954.2,2931.8,3228.0,3463.6,3277.4,3594.2,3522.2,3546.8,3116.2,2744.2,2446.6,2091.8,1722.0,1448.2,1075.8,717.6,575.2,536.0,858.0,1107.0,1195.2,1470.4,1533.0,1351.8,1270.6,1146.0,774.2,539.0,398.2,174.0,0.0,0.0,0.0,0.0,0.0],"inflight":[0,11,31,52,56,66,83,83,95,98,100,93,88,82,74,72,67,54,42,33,25,20,15,11,10,8,11,9,9,8,7,4,4,7,6,7,8,4,5,11,12,32,42,59,68,68,70,75,80,77,91,87,73,66,56,49,43,31,24,21,17,16,13,6,5,3,6,6,12,12,16,17,12,10,8,7,5,2,0,0,0,0,0,0,0,0,0,0]},"fixed-fast":{"p99_e2e":[null,null,null,1.8909794941698082,3.2781852152641715,3.922438077637247,4.8013868443036865,5.30538045543134,5.709848069470573,6.924877686161057,7.059780230529592,7.56084599560724,8.807822491158369,9.583047985686635,9.711717715571108,10.013168980397515,10.673137891622023,11.419063156116597,12.474316389300736,12.826777770403314,14.058976475320645,14.069483636799143,14.426763883443364,15.895964057724806,16.35644811167322,17.031650764811747,17.69336926366003,17.69185654841454,18.581282417392252,19.14602159022598,20.442467076237904,20.4400436198547,20.443149516503425,20.445607277945268,20.450522800828946,20.450522800828946,20.450522800828946,20.455438323712627,20.450522800828946,20.435776232177904,20.342434943429513,20.174975680893713,19.54644971983419,19.532312265756865,18.981349240473413,16.64556437283828,15.30951347172537,15.30738828980977,15.103089342524608,14.758255346677702,12.882603471266055,11.412980134373493,11.394111342438986,11.262417936863546,11.857481077195589,12.30995489757354,13.144503529519076,13.360187961928066,13.995476858570619,14.599842206817256,15.32552129537803,15.400905901304387,15.916969015161152,16.520517083561263,17.279856519910442,17.785050220757768,18.561461903421783,18.561461903421783,19.564675471140436,20.004313630469102,20.193743517781225,21.4057726783539,22.222902212273677,22.42183516472204,22.43944367266455,22.43944367266455,22.418313463133536,22.418313463133536,22.432400269487548,22.43592197107605,22.432400269487548,22.43944367266455,21.06992359569922,19.579544373873706,19.576296489146902,19.577595643037625,17.98650556308666,16.74148110351191],"throughput_tok_per_s":[0.0,0.0,22.0,135.8,543.6,775.0,1389.4,1653.6,1758.2,1810.0,1836.4,1469.6,1526.0,1776.0,1585.2,1661.2,1689.4,1642.4,1667.0,1667.0,1826.4,1675.2,1562.4,1652.0,1791.0,1626.6,1949.2,1964.2,1770.4,1557.2,1683.6,1666.4,1917.6,1760.2,1770.6,1695.8,1736.4,1449.4,1684.6,1857.6,1757.4,1650.0,1655.2,1831.6,1662.2,1659.6,1536.2,1755.6,1522.6,1613.2,1779.0,1748.8,1679.0,1700.6,1759.2,1615.6,1764.0,1720.6,1610.0,1463.0,1601.0,1575.8,1685.2,1665.2,1856.0,1601.2,1618.2,1550.0,1832.0,1811.4,1736.8,1863.6,1923.8,1696.6,1390.0,1500.2,1748.4,1770.8,1676.0,1892.8,1810.2,1475.0,1444.4,1620.4,1761.8,1747.6,1632.4,1368.2],"inflight":[0,11,31,50,53,63,76,84,97,102,111,111,109,106,107,103,99,95,92,90,87,88,91,87,83,79,77,74,71,72,68,62,56,52,49,46,42,39,34,33,32,49,59,70,80,84,93,101,108,112,122,122,117,113,107,103,101,96,96,98,93,92,87,83,79,77,75,71,71,66,72,69,66,64,65,64,53,47,42,36,33,27,19,13,6,4,1,0]},"static-lb":{"p99_e2e":[null,null,null,null,null,2.6537065421524604,3.6303163406209507,6.72847436140625,7.029444476930661,8.17480044331358,8.822396512326325,8.987369945536637,10.022887635841988,11.400520699214347,11.512184353735526,11.567787573327784,13.738284977713683,14.09399495805045,14.921298930072037,16.631591238231476,17.696520492818653,17.771061569326836,19.29142762179748,21.581682122300222,21.581737162277015,21.78751564282146,21.858035519645544,21.82781271529236,23.005002691867958,23.004469925315913,23.280293224797013,24.36488047779046,25.151386020641155,25.34211667126799,25.48370469776208,25.69630952606527,25.69610568226735,25.697328745054868,25.69916333923614,25.700794089619496,25.701609464811174,25.703036371396607,25.703851746588285,25.704667121779963,25.66702579451391,21.685016950399216,13.86255708960214,13.619605719260399,12.842329629488958,11.932723442561013,12.24557679110737,12.558859383259225,12.554305238183407,12.52698036772851,12.517872077576875,12.391160799275243,14.406629526910793,14.408757447758578,16.95154662713022,20.227813744005687,20.227813744005687,20.226369694312336,20.215698144500298,22.49825601820652,22.794602968022463,22.828943815557164,22.829509045491296,22.828566995601076,22.828566995601076,22.946938720317984,23.069298730265032,23.086117797642565,23.253858335639638,23.26027977781071,24.131927226175616,24.811062852297084,24.812478000910872,24.813421433320062,24.81578001434304,24.81908202777521,24.820497176388997,24.82096889259359,24.821440608798188,24.82191232500278,24.82757291945793,13.232348260371277,13.248561401818773,13.297200826161252],"throughput_tok_per_s":[0.0,0.0,0.0,22.0,22.0,74.0,121.0,348.6,592.2,780.8,1011.6,1245.0,1374.4,1636.6,1718.6,1702.0,1989.0,1898.4,1725.8,2096.4,2476.8,2327.0,2430.4,2561.4,2094.2,1940.6,1712.2,1801.4,2249.0,2736.2,2566.0,2874.0,2866.8,2371.6,2266.0,2509.6,2382.8,2176.8,1927.8,1576.8,1112.2,956.6,892.6,822.6,777.2,917.4,874.2,932.4,1105.2,1185.0,1280.6,1434.0,1462.4,1494.6,1684.2,1570.4,1670.2,1518.8,1722.2,2082.2,2267.8,2325.2,2888.2,2745.2,2504.4,2558.8,2394.4,2149.8,2553.4,2697.2,2619.0,2566.0,2321.2,1601.0,1507.2,1775.2,1599.0,1849.0,2170.2,1777.2,1362.2,1514.6,1276.8,989.6,784.8,546.2,305.2,102.4],"inflight":[0,11,32,53,63,75,94,104,115,124,130,129,124,119,119,116,107,102,100,94,86,82,81,76,74,68,70,64,55,48,45,37,32,29,22,19,18,16,16,21,22,43,52,70,81,86,91,98,105,107,117,116,111,107,103,101,98,96,90,85,79,75,67,64,58,52,50,44,42,35,37,38,38,39,30,25,23,17,11,9,6,3,1,0,0,0,0,0]}},"controller":{"level":[0,0,0,1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],"events":[{"t":2.001972998000383,"level":1,"reason":"escalate: util0=0.94 ttft_p95=None"},{"t":3.002929549000328,"level":2,"reason":"escalate: util0=0.94 ttft_p95=None"}]}},"mixed_length":{"pattern":"mixed_length","rep":0,"t":[0.0,1.0,2.0,3.0,4.0,5.0,6.0,7.0,8.0,9.0,10.0,11.0,12.0,13.0,14.0,15.0,16.0,17.0,18.0,19.0,20.0,21.0,22.0,23.0,24.0,25.0,26.0,27.0,28.0,29.0,30.0,31.0,32.0,33.0,34.0,35.0,36.0,37.0,38.0,39.0,40.0,41.0,42.0,43.0,44.0,45.0,46.0,47.0,48.0,49.0,50.0,51.0,52.0,53.0,54.0,55.0,56.0,57.0,58.0,59.0,60.0,61.0,62.0,63.0,64.0,65.0,66.0,67.0,68.0,69.0,70.0,71.0,72.0,73.0,74.0,75.0,76.0,77.0,78.0,79.0,80.0,81.0],"arrivals":[0.0,1.0,2.4,4.6,7.6,9.6,11.0,10.2,9.6,8.0,8.6,8.2,8.4,9.0,10.2,8.6,7.8,9.2,7.8,7.2,8.0,8.4,7.4,8.4,8.6,8.4,8.6,9.0,8.2,7.2,6.8,7.4,8.4,10.2,10.0,10.8,11.2,9.8,8.6,8.8,8.2,6.6,6.4,6.8,7.0,6.6,7.2,7.4,7.2,7.8,8.0,7.2,7.0,7.0,6.4,6.8,6.8,8.0,7.8,9.0,9.2,10.0,9.0,9.0,8.8,9.2,8.6,9.4,8.6,7.4,7.0,7.6,6.4,7.0,7.2,6.0,4.2,3.4,2.0,0.6,0.0,0.0],"policies":{"adaptive":{"p99_e2e":[null,null,1.1732464806450364,1.793685561124033,3.2956086086676333,3.345602299981183,3.29331262862671,3.6931330214077716,4.419059137152166,6.51091623844087,6.637475941315565,6.60168267262085,7.790510744328772,7.790510744328772,7.913480404070714,9.555816981425464,10.982973334759594,10.845666420312032,12.681802891113897,14.26059723382732,14.259000775419082,14.26059723382732,14.259000775419082,14.576527668474373,15.594026998207331,15.69904648007929,15.69904648007929,15.69904648007929,15.695604999102514,15.704208701544452,15.707650182521228,15.705929442032842,15.705929442032842,15.704208701544452,15.900824576055328,16.243282869364613,16.243282869364613,16.246305837223385,16.246977607858668,16.246305837223385,16.24529818127046,16.24529818127046,16.245969951905742,16.682864918705146,18.03483925336471,18.03601690225798,18.03483925336471,18.03483925336471,18.033956016694756,18.035133665588027,18.238851088261875,18.7898229642789,18.786467750743842,18.787958956759425,18.7898229642789,18.79056856728669,18.79056856728669,18.788704559767215,18.789450162775005,18.79056856728669,18.7511101005504,17.998928395729294,17.48853610405803,17.478037516696702,16.557160059098972,16.5600352033077,16.293348077430384,16.2982340452534,16.38150260467876,16.368926265483083,16.3642101382847,16.359494011086323,16.359494011086323,16.359494011086323,16.3642101382847,15.809796167070273,16.10810704686219,16.09886083971396,15.77731270495936,15.79702165991234,15.820015440690813,15.856148524771276],"throughput_tok_per_s":[0.0,0.0,79.6,180.6,356.6,437.6,615.2,679.0,743.0,908.2,1024.8,1043.6,1146.0,1048.6,919.4,1078.4,1086.6,1249.6,1408.2,1744.8,1631.4,1627.4,1385.6,1536.0,1359.6,1460.8,1509.4,1756.8,1519.6,1367.2,1288.2,1278.2,1162.8,1303.4,1400.0,1502.8,1470.6,1295.6,1144.8,1109.6,1007.2,1102.6,1113.0,1350.0,1712.0,1749.2,1777.0,1815.8,1741.0,1275.0,1302.4,1616.0,1923.6,1781.2,1802.6,1633.6,1437.6,1301.6,1402.0,1305.0,1335.2,1107.6,1095.2,1151.2,1413.0,1669.4,1775.4,1512.8,1724.0,1629.4,1431.8,1550.2,1749.6,1474.0,1393.4,1540.0,1610.0,1589.8,1563.6,1638.0,1303.2,891.0],"inflight":[0,5,8,15,24,30,34,31,32,30,36,37,35,42,49,45,44,41,40,38,39,39,38,38,41,42,44,38,36,35,35,38,44,48,44,43,50,51,54,51,49,46,46,47,44,42,40,41,42,47,46,38,29,33,35,38,32,33,35,46,50,50,47,48,50,51,45,52,43,39,40,37,32,32,32,27,17,12,6,2,1,0]},"fixed-bulk":{"p99_e2e":[null,null,1.1658230498956865,1.8011791394222019,2.7631645913503693,2.7661626258343746,4.116339882467355,4.3992296860608,4.3412885407410196,5.4412788148827325,5.8226506810817025,5.822150077787611,5.8220944551993785,5.821927587434681,5.838950191293193,6.1069605719180755,6.105258957076154,6.1073008948864596,6.1073008948864596,6.107981540823228,6.107641217854844,6.108321863791612,6.106620248949691,6.107641217854844,6.107641217854844,5.163894389824716,5.140014476783657,5.139229223520192,5.14372707046701,5.1439673237457795,5.1439673237457795,5.1439072604260865,5.143787133786702,5.143787133786702,5.104159619692791,5.10553413080064,5.10553413080064,5.359453465009499,6.29541564322418,6.295778839927025,6.321298552140709,6.321359352185719,6.321784952500789,6.3215417523207496,6.322149752770851,6.32202815268083,6.322149752770851,6.32202815268083,6.318826742472687,6.3187413231727705,5.431857037736907,5.408933729134295,5.0376300693510085,5.057049589047785,4.871519926488908,4.8628652367086325,4.865750133302057,4.872962374785619,4.977761487272329,4.9773546613141315,5.109668124832704,5.13023820621718,5.125095685871065,5.089098043448221,5.094240563794344,5.299184901139481,5.5184246242715895,5.51385946970457,5.510207346050955,5.50929431513755,5.287907288161435,5.29137962518012,5.294851962198802,5.312213647292221,5.30874131027354,5.326102995366959,4.930329837837257,4.974080761552141,5.013456592895539,4.720379492220439,4.734352534853188,4.439998630229177],"throughput_tok_per_s":[0.0,0.0,79.6,206.2,425.2,684.4,920.6,1201.2,1323.2,1525.0,1584.2,1655.8,1407.4,1505.0,1559.8,1720.4,1832.2,1883.4,1814.6,1574.2,1332.4,1108.0,1279.6,1310.6,1558.8,1489.4,1530.0,1638.6,1561.8,1194.6,1190.0,1386.4,1387.8,1293.0,1542.4,1525.8,1373.6,1277.0,1682.8,1476.6,2070.4,2020.6,1941.4,1689.4,1745.8,1196.2,1262.4,1383.6,1337.8,1282.2,1252.8,1403.2,1317.2,1219.8,1186.8,1403.0,1058.6,1073.6,1129.4,1197.2,1381.6,1523.8,1613.4,1729.2,1667.2,1470.8,1682.8,1678.6,1568.6,1905.4,1689.8,1437.0,1322.2,1278.2,1084.0,1103.6,1113.2,911.4,746.4,573.2,403.6,190.2],"inflight":[0,5,8,13,21,20,25,17,17,14,21,22,21,23,23,16,10,16,12,14,16,17,13,16,14,16,17,13,12,14,13,17,18,26,15,22,28,24,18,21,13,12,12,12,13,13,16,10,13,17,17,11,7,13,14,11,12,16,19,24,19,21,17,15,22,23,18,16,11,8,10,13,8,10,11,9,3,1,1,0,0,0]},"fixed-fast":{"p99_e2e":[null,null,1.1973123224946423,1.8079741611110876,2.7687839575893034,2.741443679905156,3.909732786384676,3.874510594499752,4.775277167636229,5.194754511347142,5.179613674321325,5.352098170030302,5.343370091621699,5.507039064518933,5.533531561755263,5.531115131657277,5.5278932248599615,5.5278932248599615,5.530309654957947,5.531115131657277,5.531920608356605,5.530309654957947,5.531115131657277,5.21968390894121,5.122617606667133,5.056697733551535,5.058126138948065,5.055983530853269,5.0574119362498,5.060268747042861,5.042902128197858,5.042923066925494,5.042860250742589,5.042860250742589,4.981982839550456,4.981298977692616,5.075855001879381,5.270058543316804,5.423157745685851,5.6549339724329934,5.81094604657196,5.81075405423161,5.8111380389123095,5.8898186302005024,6.081522261196284,6.098235686438945,6.098235686438945,6.077343904885616,6.081522261196284,6.106592399060281,6.106592399060281,6.110770755370943,6.094057330128282,5.194040217147139,4.737925627791662,4.847286002426765,4.847538236224032,4.848168820717198,4.85986104823932,4.859374129736967,4.890127767222054,4.895267903602647,4.8932118490504095,4.888071712669815,4.888071712669815,5.050118438523129,5.033514548391517,5.024026611173451,5.014538673955385,5.01928264256442,5.026398595477969,5.026398595477969,5.229555150577436,5.229747497601504,5.229811613276193,4.911258385224503,4.9353695190155396,4.967517697403586,5.00770292038865,4.9604347979125905,5.006100644532825,5.034641798670472],"throughput_tok_per_s":[0.0,0.0,79.6,206.2,425.2,696.8,947.2,1115.6,1426.2,1620.6,1532.2,1542.4,1661.8,1488.8,1495.8,1723.6,1827.6,1714.6,1727.8,1542.6,1368.8,1246.0,1279.6,1340.0,1558.8,1489.4,1554.8,1638.6,1532.4,1194.6,1292.4,1414.6,1387.8,1335.6,1542.4,1578.2,1391.2,1317.0,1439.8,1615.0,1638.2,1720.4,1663.6,1823.2,1607.4,1473.6,1445.4,1621.4,1404.4,1282.2,1294.8,1403.2,1317.2,1219.8,1211.8,1361.0,1058.6,1073.6,1172.0,1380.6,1445.8,1518.0,1613.4,1628.2,1458.8,1496.4,1707.4,1633.4,1605.0,1872.6,1600.0,1315.8,1367.4,1300.2,1116.8,1103.6,1166.8,911.4,746.4,573.2,403.6,239.0],"inflight":[0,5,8,13,21,21,26,21,18,16,21,24,19,24,26,18,13,16,12,14,16,15,13,15,14,16,16,13,12,14,12,16,18,25,18,19,27,26,27,21,21,16,16,13,13,13,16,10,13,17,16,11,7,13,13,11,12,16,18,20,18,22,17,17,22,24,19,18,12,9,10,14,8,10,11,9,4,1,1,0,0,0]},"static-lb":{"p99_e2e":[null,null,null,2.09208442261584,2.4975453863271655,2.5223417082479433,5.3204914639844905,5.1921444790093725,5.117275404440554,5.571594517329816,5.566281458512654,5.563624929104074,8.955792537761619,10.16490801293028,10.18608356802667,10.101381347641176,11.518601249938028,11.517369185515944,14.043211376560267,14.005544065517393,15.162612554560658,15.147158780479907,15.108524345278049,15.100797458237684,15.069889910076192,15.922686397032614,16.958947679248336,16.967769207241897,16.974385353237064,16.972179971238674,16.965563825243503,16.969974589240287,16.976590735235455,16.976590735235455,16.972179971238674,16.409597873932363,16.251000652541084,16.253231694606665,16.254904976155853,16.25657825770504,16.478589949692584,16.451814036540846,16.465201993116715,16.4088664767784,17.304272797465522,17.31766019484158,17.30873526325754,17.29534786588148,17.286422934297445,17.29088540008947,17.795421335234927,17.765913600878125,18.112782144779203,18.121977444023866,18.128107643520305,18.121977444023866,18.13117274326853,18.134237843016745,18.13730294276497,18.143433142261408,17.46687919909428,17.52809788393973,15.944857436448084,15.986341528888456,15.300487704593376,15.2969077140268,15.29153772817694,15.28974773289365,15.577417042736151,15.51634410064161,15.522451394851068,15.473593041175441,16.0594464910056,16.036879233428184,16.066968910198074,16.08201374858302,16.112103425352924,16.12714826373787,14.915804467234272,15.093499159257972,14.794163148604394,15.115660081452445],"throughput_tok_per_s":[0.0,0.0,8.2,50.6,139.6,228.6,485.0,773.6,860.6,938.0,1051.6,875.0,800.2,1031.2,1015.6,1029.0,1254.0,1443.0,1578.4,1694.6,1777.4,1663.8,1702.4,1433.8,1389.0,1451.8,1626.6,1396.2,1356.4,1546.6,1583.0,1312.2,1380.6,1538.2,1452.8,1278.2,1380.0,1176.0,983.6,831.0,941.0,1051.4,1273.4,1513.4,1989.2,1879.4,1908.6,1918.8,1762.0,1318.8,1513.4,1738.0,1836.4,1856.0,1990.8,1813.4,1463.0,1282.4,1250.6,1087.6,1069.8,1040.2,958.2,1023.0,1237.8,1318.8,1518.2,1592.4,1639.2,1599.4,1653.2,1771.2,1935.8,1825.8,1679.6,1604.8,1421.4,1318.0,1325.4,1423.4,1202.6,989.8],"inflight":[0,5,11,20,30,36,39,30,31,33,38,44,41,44,53,50,48,46,39,41,43,45,39,39,42,45,42,41,38,35,31,39,43,48,43,45,50,51,54,54,52,50,48,47,44,44,42,40,42,47,44,37,30,31,30,31,28,32,34,44,43,48,48,50,52,54,49,51,47,40,40,37,30,28,29,25,18,12,7,2,1,0]}},"controller":{"level":[0,0,0,0,1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,1],"events":[{"t":3.003055203999793,"level":1,"reason":"escalate: util0=0.88 ttft_p95=0.0330915731285885"},{"t":4.005470074999721,"level":2,"reason":"escalate: util0=0.94 ttft_p95=0.03496197195310178"},{"t":80.11543491999964,"level":1,"reason":"de-escalate: pool_util=0.01"}]}}},"calibration":{"marlin":2828.114285714286,"awq":1354.2857142857142}};
+const $ = (s, r = document) => r.querySelector(s);
+const NS = "http://www.w3.org/2000/svg";
+const STATIC = /[?&]static/.test(location.search); if (STATIC) document.documentElement.classList.add("static");
+const reduce = STATIC || matchMedia("(prefers-reduced-motion: reduce)").matches;
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function h(tag, attrs = {}, ...kids) { const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) { if (k === "class") e.className = v; else if (k === "html") e.innerHTML = v; else if (k.startsWith("on")) e.addEventListener(k.slice(2), v); else e.setAttribute(k, v); }
+  for (const c of kids.flat()) if (c != null) e.append(c.nodeType ? c : document.createTextNode(c)); return e; }
+const f0 = v => v == null ? "n/a" : Math.round(v).toLocaleString("en-US"), f1 = v => v == null ? "n/a" : v.toFixed(1), f2 = v => v == null ? "n/a" : v.toFixed(2);
+const pctS = v => (v >= 0 ? "+" : "") + Math.round(v) + "%";
+const sc = (d0, d1, r0, r1) => v => r0 + (v - d0) / ((d1 - d0) || 1) * (r1 - r0);
+function hide(id) { const e = $(id); if (e) e.classList.add("hidden"); }
+
+/* ---------- tooltip, reveal, theme ---------- */
+const tip = $("#tip");
+document.addEventListener("mousemove", e => {
+  const t = e.target.closest && e.target.closest("[data-tip]");
+  if (!t) { tip.style.display = "none"; return; }
+  tip.innerHTML = t.getAttribute("data-tip"); tip.style.display = "block";
+  tip.style.left = Math.min(e.clientX + 14, innerWidth - 280) + "px"; tip.style.top = (e.clientY + 16) + "px";
+});
+const io = new IntersectionObserver(es => es.forEach(x => { if (x.isIntersecting) { x.target.classList.add("in"); io.unobserve(x.target); x.target.dispatchEvent(new Event("revealed")); } }), { threshold: .12 });
+document.querySelectorAll(".reveal").forEach(e => io.observe(e));
+const qTheme = new URLSearchParams(location.search).get("theme"); if (qTheme) document.documentElement.setAttribute("data-theme", qTheme);
+try { const saved = qTheme ? null : localStorage.getItem("inferno-theme"); if (saved) document.documentElement.setAttribute("data-theme", saved); } catch (e) {}
+$("#theme").onclick = () => { const cur = document.documentElement.getAttribute("data-theme"), nxt = cur === "dark" ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", nxt); try { localStorage.setItem("inferno-theme", nxt); } catch (e) {} rerender(); };
+
+function countUp(el, target, fmt, dur = 1300) {
+  if (reduce) { el.textContent = fmt(target); return; }
+  const t0 = performance.now(); const tick = now => { const p = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - p, 3);
+    el.textContent = fmt(target * e); if (p < 1) requestAnimationFrame(tick); }; requestAnimationFrame(tick);
+}
+
+/* ---------- derived facts (everything on the page comes from D) ---------- */
+const K = D.kernel, C = D.campaign, X = D.contention, E = D.e2e;
+function bestCustom(sh) { const c = sh.kernels.filter(k => (k.k === "int4_v3_pad" || k.k === "int4_v4_alg" || k.k === "int4_v5_reuse" || k.k === "int4_v6_lane16") && k.ok); return c.reduce((a, b) => a.us < b.us ? a : b); }
+function cublasOf(sh) { return sh.kernels.find(k => k.k === "cublas_fp16"); }
+let topShape = null, topBest = null;
+if (K) K.shapes.forEach(s => { const b = bestCustom(s); if (!topBest || b.pct > topBest.pct) { topBest = b; topShape = s; } });
+const contRatios = X ? ["rho0.3", "rho0.6"].map(p => X.comps.find(c => c.pattern === p && c.comparison === "split-active vs split-idle" && c.metric === "e2e_p99")).filter(Boolean).map(c => c.ratio_a_over_b) : [];
+const contIdle = X ? ["rho0.3", "rho0.6"].map(p => X.comps.find(c => c.pattern === p && c.comparison === "split-idle vs single" && c.metric === "e2e_p99")).filter(Boolean).map(c => c.ratio_a_over_b) : [];
+const pp = D.mpi && D.mpi.pingpong ? Object.fromEntries(D.mpi.pingpong.map(r => [r.bytes, r])) : null;
+
+$("#hwchip").innerHTML = `<b>${D.hw.gpu}</b> · vLLM ${D.hw.vllm || ""} · Qwen2.5-1.5B` + (C ? ` · ${Object.values(C.cells).reduce((a, p) => a + Object.values(p).reduce((b, c) => b + c.n, 0), 0)}-run paired campaign` : "");
+
+/* ---------- KPIs ---------- */
+(function kpis() {
+  const box = $("#kpis"), items = [];
+  if (topBest) items.push({ tag: "CUDA kernel", val: cublasOf(topShape).us / topBest.us, fmt: v => f2(v) + "×", lbl: `faster than fp16 cuBLAS on ${topShape.name.replace("_", " ")}, at ${Math.round(topBest.pct)}% of DRAM peak`, c: "var(--s1)" });
+  if (E && E.configs.inferno_b8 && E.configs.awq_marlin) items.push({ tag: "In vLLM, 1 sequence", val: E.configs.inferno_b8.by["1"].ratio, fmt: v => f2(v) + "×", lbl: "of the default Marlin path's decode speed: parity, not a win (Marlin leads with 4+ sequences)", c: "var(--s2)" });
+  if (C && C.h1.length) { const lo = Math.min(...C.h1.map(r => r.pct_change)), hi = Math.max(...C.h1.map(r => r.pct_change));
+    items.push({ tag: "Adaptive routing", text: `${pctS(lo)} to ${pctS(hi)}`, lbl: "p99 vs the best fixed configuration. Hypothesis rejected.", c: "var(--bad)" }); }
+  if (contRatios.length) items.push({ tag: "GPU co-residency", val: contRatios.reduce((a, b) => a + b, 0) / contRatios.length, fmt: v => f1(v) + "×", lbl: "p99 when a second replica is active on the same GPU", c: "var(--s2)" });
+  if (pp) items.push({ tag: "MPI routing", val: pp[64].one_way_us_est, fmt: v => "≈" + Math.round(v) + " µs", lbl: "per hop in isolation; no measurable end-to-end difference from HTTP", c: "var(--s3)" });
+  items.forEach(it => { const n = h("div", { class: "num" }, it.text || "0"); box.append(h("div", { class: "kpi reveal", style: "--accent:" + it.c }, h("div", { class: "tag" }, it.tag), n, h("div", { class: "lbl" }, it.lbl)));
+    if (!it.text) countUp(n, it.val, it.fmt); });
+  box.querySelectorAll(".reveal").forEach(e => requestAnimationFrame(() => e.classList.add("in")));
+})();
+
+/* ---------- kernel section ---------- */
+const LADDER = ["cublas_fp16", "unfused_naive", "int4_v0_naive", "int4_v1_warp", "int4_v2_vec", "int4_v3_pad", "int4_v4_alg", "int4_v5_reuse", "int4_v6_lane16"];
+const KNAME = { cublas_fp16: "fp16 cuBLAS", unfused_naive: "unfused + cuBLAS", int4_v0_naive: "v0 thread per row", int4_v1_warp: "v1 warp per row", int4_v2_vec: "v2 vector + smem", int4_v3_pad: "v3 no bank conflicts", int4_v4_alg: "v4 algebraic", int4_v5_reuse: "v5 register reuse", int4_v6_lane16: "v6 balanced lanes" };
+const KCOL = { cublas_fp16: "var(--neutral)", unfused_naive: "var(--neutral)", int4_v0_naive: "var(--l0)", int4_v1_warp: "var(--l1)", int4_v2_vec: "var(--l2)", int4_v3_pad: "var(--l3)", int4_v4_alg: "var(--l4)", int4_v5_reuse: "var(--l5)", int4_v6_lane16: "var(--l6)" };
+const ROLE = { qkv: "qwen1.5B_qkv", o_proj: "qwen1.5B_o_proj", gate_up: "qwen1.5B_gate_up", down: "qwen1.5B_down" };
+let kSel = 0, kMode = "speed";
+function renderKernel() {
+  const sh = K.shapes[kSel], base = cublasOf(sh), rows = [];
+  LADDER.forEach(n => { const k = sh.kernels.find(x => x.k === n); if (k) rows.push({ name: KNAME[n], us: k.us, col: KCOL[n], pct: k.pct, spread: k.spread, best: false, id: n }); });
+  const role = Object.keys(ROLE).find(r => sh.name === ROLE[r]);
+  if (role && K.lib) { if (K.lib.marlin) rows.push({ name: "vLLM Marlin (in situ)", us: K.lib.marlin[role], col: "var(--s2)", lib: true }); if (K.lib.awq) rows.push({ name: "vLLM AWQ kernel (in situ)", us: K.lib.awq[role], col: "var(--s3)", lib: true }); if (K.lib.inferno) rows.push({ name: "custom v6 (in situ)", us: K.lib.inferno[role], col: "var(--l6)", lib: true, onl4: true }); }
+  const best = bestCustom(sh); rows.forEach(r => { if (r.id === best.k) r.best = true; });
+  const val = r => kMode === "speed" ? base.us / r.us : r.us, ceil = sh.ceil || 4, maxV = Math.max(...rows.map(val), kMode === "speed" ? ceil * 1.05 : 0) * 1.03;
+  const box = $("#kbars"); box.innerHTML = "";
+  rows.forEach(r => { const v = val(r), w = Math.max(1.5, v / maxV * 100), outside = w < 15;
+    const label = kMode === "speed" ? `${f2(v)}×` : `${f1(v)} µs`;
+    const tipHtml = `<b>${r.name}</b><br>${f1(r.us)} µs · ${f2(base.us / r.us)}× vs cuBLAS` + (r.pct ? `<br>${r.pct.toFixed(0)}% of DRAM peak` : "") + (r.spread > 20 ? `<br>run-to-run spread ${r.spread.toFixed(0)}% (noisy)` : "");
+    const fill = h("div", { class: "fill" + (r.onl4 ? " on-l4" : ""  ) + ((r.id === "int4_v4_alg" || r.id === "int4_v5_reuse" || r.id === "int4_v6_lane16") ? " on-l4" : (r.id === "cublas_fp16" || r.id === "unfused_naive") ? " on-neutral" : ""), style: `background:${r.col}`, "data-tip": tipHtml }, outside ? "" : label);
+    const track = h("div", { class: "track" }, fill);
+    if (outside) track.append(h("span", { class: "outlbl", style: `left:calc(${w}% + 8px)` }, label));
+    box.append(h("div", { class: "row" }, h("div", { class: "name" + (r.best ? " hl" : ""), title: r.name }, (r.best ? "★ " : "") + r.name), track));
+    requestAnimationFrame(() => requestAnimationFrame(() => { fill.style.width = w + "%"; })); });
+  if (kMode === "speed") { const ov = h("div", { class: "overlay", "aria-hidden": "true" });
+    ov.append(h("div", { class: "mk", style: `left:${1 / maxV * 100}%` }, h("span", {}, "1× (fp16)")));
+    ov.append(h("div", { class: "mk", style: `left:${ceil / maxV * 100}%` }, h("span", { style: "left:auto;right:5px" }, f2(ceil) + "× ceiling"))); box.append(ov); }
+  $("#kernel-meta").textContent = `${sh.N.toLocaleString()} × ${sh.K.toLocaleString()} weights · ${(sh.bytes / 1048576).toFixed(1)} MB packed int4`;
+  const sp = base.us / best.us, jitter = sh.kernels.filter(k => k.k.startsWith("int4_v")).some(k => k.spread > 20);
+  $("#kernel-callout").innerHTML = `<b>${KNAME[best.k]}</b> is fastest here: <b>${f2(sp)}×</b> over fp16 cuBLAS (the byte-ratio ceiling is ${f2(ceil)}×) at <b>${Math.round(best.pct)}%</b> of peak bandwidth.` + (jitter ? " This layer is small, so launch and clock jitter dominate and the ranking among v1 to v4 is not meaningful." : "");
+  drawGauge(best.pct); $("#gauge-note").innerHTML = `${best.gbps.toFixed(0)} GB/s achieved of ${K.peak.toFixed(0)} GB/s theoretical<br><span style="color:var(--good)">✓ matches the CPU reference</span> (max relative error ${K.maxerr.toExponential(1)})`;
+}
+function drawGauge(pct) {
+  const svg = $("#gauge"), cx = 110, cy = 112, r = 88, a = p => Math.PI * (1 - p);
+  const pt = p => [cx + r * Math.cos(a(p)), cy - r * Math.sin(a(p))], d = p => { const [x, y] = pt(p); return `M ${cx - r} ${cy} A ${r} ${r} 0 ${p > .5 ? 1 : 0} 1 ${x} ${y}`; };
+  svg.innerHTML = `<defs><linearGradient id="gg" x1="0" x2="1"><stop offset="0" stop-color="var(--s1)"/><stop offset="1" stop-color="var(--s3)"/></linearGradient></defs>
+    <path d="M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}" fill="none" stroke="var(--card2)" stroke-width="16" stroke-linecap="round"/>
+    <path id="garc" d="${d(Math.max(.001, pct / 100))}" fill="none" stroke="url(#gg)" stroke-width="16" stroke-linecap="round" style="${reduce ? "" : "transition:d .9s"}"/>
+    <text x="${cx - r}" y="${cy + 16}" text-anchor="middle">0</text><text x="${cx + r}" y="${cy + 16}" text-anchor="middle">peak</text>`;
+  countUp($("#gauge-num"), pct, v => Math.round(v) + "%", 900);
+}
+function ktable() {
+  const cols = LADDER.concat([]); let t = `<table><tr><th>layer</th>${cols.map(c => `<th>${KNAME[c]}</th>`).join("")}<th>spread</th></tr>`;
+  K.shapes.forEach(s => { const m = Math.max(...s.kernels.map(k => k.spread)); t += `<tr><td>${s.name} ${s.N}×${s.K}</td>${cols.map(c => `<td>${f1(s.kernels.find(k => k.k === c).us)}</td>`).join("")}<td>${m.toFixed(0)}%</td></tr>`; });
+  $("#ktable").innerHTML = t + "</table><p class='note'>Microseconds, median of " + K.runs + " benchmark invocations. Spread = run-to-run.</p>";
+}
+if (K) {
+  const chips = $("#shape-chips");
+  K.shapes.forEach((s, i) => { const b = h("button", { class: "pill", "aria-pressed": "false" }, s.name.replace("qwen1.5B_", "Qwen ").replace("llama7B_", "Llama-7B "));
+    b.onclick = () => { kSel = i; [...chips.children].forEach((c, j) => c.setAttribute("aria-pressed", j === i)); renderKernel(); }; chips.append(b); });
+  kSel = K.shapes.indexOf(topShape); chips.children[kSel].setAttribute("aria-pressed", "true");
+  const setMode = m => { kMode = m; $("#m-speed").setAttribute("aria-pressed", m === "speed"); $("#m-time").setAttribute("aria-pressed", m === "time"); renderKernel(); };
+  $("#m-speed").onclick = () => setMode("speed"); $("#m-time").onclick = () => setMode("time");
+  $("#kernel").addEventListener("revealed", renderKernel); renderKernel(); ktable();
+} else hide("#kernel");
+
+/* ---------- end to end ---------- */
+const ECOL = { fp16: "var(--neutral)", awq_classic: "var(--s3)", awq_marlin: "var(--s2)", inferno_b2: "var(--l5)", inferno_b8: "var(--l6)" };
+const ESHORT = { fp16: "fp16", awq_classic: "AWQ classic kernel", awq_marlin: "Marlin (vLLM default)", inferno_b2: "custom, ≤2 tokens", inferno_b8: "custom, ≤8 tokens" };
+const EORD = ["fp16", "awq_classic", "awq_marlin", "inferno_b2", "inferno_b8"];
+let eSel = "1";
+function renderE2E() {
+  const names = EORD.filter(n => E.configs[n]); if (!names.length) return;
+  const vals = names.map(n => E.configs[n].by[eSel]), max = Math.max(...vals.map(v => v.mean + (v.ci || 0))) * 1.05, box = $("#e2e-bars"); box.innerHTML = "";
+  names.forEach((n, i) => { const v = vals[i], w = Math.max(1.5, v.mean / max * 100), lbl = `${Math.round(v.mean)} tok/s` + (n !== E.reference && v.ratio ? ` · ${f2(v.ratio)}× Marlin` : "");
+    const fill = h("div", { class: "fill" + ((n === "inferno_b8" || n === "inferno_b2") ? " on-l4" : n === "fp16" ? " on-neutral" : ""), style: `background:${ECOL[n]}`, "data-tip": `<b>${E.configs[n].label}</b><br>${Math.round(v.mean)} ± ${Math.round(v.ci || 0)} tokens/s (mean of ${E.configs[n].n} process repetitions)` }, w > 40 ? lbl : "");
+    const track = h("div", { class: "track" }, fill); if (w <= 40) track.append(h("span", { class: "outlbl", style: `left:calc(${w}% + 8px)` }, lbl));
+    box.append(h("div", { class: "row" }, h("div", { class: "name" + (n === "inferno_b8" ? " hl" : ""), title: E.configs[n].label }, ESHORT[n] || E.configs[n].label), track));
+    requestAnimationFrame(() => requestAnimationFrame(() => { fill.style.width = w + "%"; })); });
+  $("#e2e-note").textContent = `Decode throughput (output tokens/s), ${eSel} concurrent sequence${eSel === "1" ? "" : "s"}, vLLM 0.11 with CUDA graphs, Qwen2.5-1.5B on an RTX 4060 Laptop. Mean of ${E.configs[names[0]].n} fresh-process repetitions.`;
+}
+if (E && E.configs.inferno_b8 && E.configs.awq_marlin) {
+  const r1 = E.configs.inferno_b8.by["1"], r4 = E.configs.inferno_b8.by["4"], lc = E.configs.inferno_b8.layer_check;
+  $("#e2e-sub").innerHTML = `The custom kernel is patched into vLLM as a torch custom op and verified on the real checkpoint${lc ? ` (${lc.n_layers_checked} layers, max relative error ${lc.max_rel_err.toExponential(1)})` : ""}. At one sequence it decodes at ${Math.round(r1.mean)} tokens/s: <b>${f2(r1.ratio)}×</b> the default Marlin path, ahead of the classic AWQ kernel and 2× fp16. With four sequences it is <b>${f2(r4.ratio)}×</b> Marlin. Parity, not a win.`;
+  const chips = $("#e2e-chips");
+  E.concurrency.forEach(c => { const b = h("button", { class: "pill", "aria-pressed": String(String(c) === eSel) }, c === 1 ? "1 sequence" : `${c} sequences`);
+    b.onclick = () => { eSel = String(c); [...chips.children].forEach(x => x.setAttribute("aria-pressed", x === b)); renderE2E(); }; chips.append(b); });
+  $("#e2e").addEventListener("revealed", renderE2E); renderE2E();
+} else hide("#e2e");
+
+/* ---------- replay ---------- */
+const POL = ["fixed-fast", "fixed-bulk", "static-lb", "adaptive"], PCOL = { "fixed-fast": "var(--s1)", "fixed-bulk": "var(--s2)", "static-lb": "var(--s3)", adaptive: "var(--adaptive)" };
+const W = 1000, M = { l: 46, r: 14, t: 10, b: 24 };
+let rp = null, pat = null, t = 0, playing = false, last = 0, speed = 8, hoverT = null;
+function chartLines(el, T, series, yMax, hgt, opt = {}) {
+  const x = sc(0, T[T.length - 1], M.l, W - M.r), y = sc(0, yMax, hgt - M.b, M.t);
+  let s = `<svg viewBox="0 0 ${W} ${hgt}" role="img" aria-label="${opt.label || ""}">`;
+  for (let i = 0; i <= 4; i++) { const v = yMax * i / 4, py = y(v); s += `<line x1="${M.l}" x2="${W - M.r}" y1="${py}" y2="${py}" stroke="var(--grid)"/><text x="${M.l - 7}" y="${py + 4}" text-anchor="end">${v < 10 ? v.toFixed(1) : Math.round(v)}</text>`; }
+  const st = Math.max(5, Math.ceil(T[T.length - 1] / 7 / 5) * 5); for (let v = 0; v <= T[T.length - 1]; v += st) s += `<text x="${x(v)}" y="${hgt - 6}" text-anchor="middle">${v}s</text>`;
+  for (const ser of series) { let d = "", pen = false;
+    ser.v.forEach((val, i) => { if (T[i] > t || val == null) { pen = false; return; } d += (pen ? "L" : "M") + x(T[i]).toFixed(1) + " " + y(Math.min(val, yMax)).toFixed(1); pen = true; });
+    if (opt.area) s += `<path d="${d} L${x(Math.min(t, T[T.length - 1]))} ${y(0)} L${x(0)} ${y(0)}Z" fill="var(--s1)" opacity=".18"/>`;
+    s += `<path d="${d}" fill="none" stroke="${ser.color}" stroke-width="${ser.w || 2}" stroke-linejoin="round" stroke-linecap="round"/>`; }
+  s += `<line x1="${x(t)}" x2="${x(t)}" y1="${M.t}" y2="${hgt - M.b}" stroke="var(--ink2)" stroke-dasharray="3 3"/>`;
+  return s + "</svg>";
+}
+function drawReplay() {
+  if (!rp) return; const T = rp.t, names = POL.filter(n => rp.policies[n]);
+  const pmax = Math.max(1, ...names.flatMap(n => rp.policies[n].p99_e2e.filter(v => v != null))) * 1.05;
+  $("#c-load").innerHTML = `<div class="note" style="margin:8px 0 0">Offered load (requests/s)</div>` + chartLines("", T, [{ v: rp.arrivals, color: "var(--muted)" }], Math.ceil(Math.max(1, ...rp.arrivals)), 130, { area: true, label: "Offered load" });
+  $("#c-p99").innerHTML = `<div class="note" style="margin:6px 0 0">p99 end-to-end latency, rolling 10 s (seconds, lower is better)</div>` + chartLines("", T, names.map(n => ({ v: rp.policies[n].p99_e2e, color: PCOL[n], w: n === "adaptive" ? 3.4 : 1.9 })), Math.ceil(pmax), 250, { label: "p99 latency by policy" });
+  const c = rp.controller;
+  if (c) { const y = sc(0, 2, 96 - M.b, M.t + 6), x = sc(0, T[T.length - 1], M.l, W - M.r); let s = `<div class="note" style="margin:6px 0 0">Adaptive controller: calm, pressured, overloaded</div><svg viewBox="0 0 ${W} 96" role="img" aria-label="Controller level">`;
+    ["calm", "pressured", "overloaded"].forEach((n, i) => s += `<line x1="${M.l}" x2="${W - M.r}" y1="${y(i)}" y2="${y(i)}" stroke="var(--grid)"/><text x="${M.l - 7}" y="${y(i) + 4}" text-anchor="end">${n}</text>`);
+    let d = ""; c.level.forEach((lv, i) => { if (T[i] > t) return; d += (d ? "L" : "M") + x(T[i]) + " " + y(lv); });
+    s += `<path d="${d}" fill="none" stroke="var(--adaptive)" stroke-width="2.6" stroke-linejoin="round"/>`;
+    c.events.forEach(e => { if (e.t <= t) s += `<circle cx="${x(e.t)}" cy="${y(e.level)}" r="4.6" fill="var(--adaptive)" stroke="var(--bg)" stroke-width="2" data-tip="<b>${e.t.toFixed(0)} s</b><br>${e.reason}"/>`; });
+    $("#c-ctl").innerHTML = s + `<line x1="${x(t)}" x2="${x(t)}" y1="${M.t}" y2="${96 - M.b}" stroke="var(--ink2)" stroke-dasharray="3 3"/></svg>`; } else $("#c-ctl").innerHTML = "";
+  const i = Math.max(0, Math.min(T.length - 1, Math.round(t))), lastVal = n => { const a = rp.policies[n].p99_e2e; for (let k = i; k >= 0; k--) if (a[k] != null) return a[k]; return null; },
+    vals = names.map(lastVal), best = Math.min(...vals.filter(v => v != null));
+  $("#live").innerHTML = names.map((n, k) => { const v = vals[k]; return `<div><div class="n"><i style="width:10px;height:10px;border-radius:3px;background:${PCOL[n]};display:inline-block"></i>${n}</div><div class="v">${v == null ? "n/a" : f1(v)}<small> s p99${v != null && v > best * 1.02 ? " · +" + Math.round((v / best - 1) * 100) + "%" : v === best ? " · best" : ""}</small></div></div>`; }).join("");
+  $("#clock").textContent = Math.floor(t) + " / " + T[T.length - 1] + " s"; $("#scrub").value = t;
+}
+function loadPattern(p) { pat = p; rp = D.replay[p]; t = rp.t[rp.t.length - 1]; $("#scrub").max = rp.t[rp.t.length - 1];
+  $("#legend").innerHTML = POL.filter(n => rp.policies[n]).map(n => `<span><i style="border-color:${PCOL[n]};${n === "adaptive" ? "border-top-width:4px" : ""}"></i>${n}</span>`).join("");
+  [...$("#pattern-tabs").children].forEach(b => b.setAttribute("aria-selected", b.dataset.p === p)); drawReplay(); }
+function tickReplay(now) { if (playing && rp) { t = Math.min(rp.t[rp.t.length - 1], t + (now - last) / 1000 * speed);
+    if (t >= rp.t[rp.t.length - 1]) { playing = false; $("#play").textContent = "Replay"; } drawReplay(); } last = now; requestAnimationFrame(tickReplay); }
+if (D.replay && Object.keys(D.replay).length) {
+  const tabs = $("#pattern-tabs"); Object.keys(D.replay).forEach(p => { const b = h("button", { class: "pill", role: "tab", "data-p": p, "aria-selected": "false" }, p.replace("_", " ")); b.onclick = () => { loadPattern(p); t = 0; playing = !reduce; $("#play").textContent = playing ? "Pause" : "Play"; drawReplay(); }; tabs.append(b); });
+  [1, 4, 8, 16].forEach(s => { const b = h("button", { class: "pill", "aria-pressed": s === speed }, s + "×"); b.onclick = () => { speed = s; [...$("#speeds").children].forEach(c => c.setAttribute("aria-pressed", c === b)); }; $("#speeds").append(b); });
+  $("#play").onclick = () => { if (t >= rp.t[rp.t.length - 1]) t = 0; playing = !playing; $("#play").textContent = playing ? "Pause" : "Play"; };
+  $("#scrub").oninput = e => { t = Number(e.target.value); drawReplay(); };
+  loadPattern(D.replay.bursty ? "bursty" : Object.keys(D.replay)[0]); requestAnimationFrame(tickReplay);
+  $("#replay").addEventListener("revealed", () => { if (!reduce) { t = 0; playing = true; $("#play").textContent = "Pause"; drawReplay(); } });
+  $("#c-load").addEventListener("mousemove", () => {});
+} else hide("#replay");
+
+/* ---------- verdict ---------- */
+if (C && C.h1.length) {
+  const box = $("#verdicts"), pols = C.policies;
+  C.h1.forEach(r => { const cells = C.cells[r.pattern], rows = pols.filter(p => cells[p]).map(p => ({ p, v: cells[p].p99, ci: cells[p].p99_ci })).sort((a, b) => a.v - b.v), mx = Math.max(...rows.map(x => x.v + x.ci)) * 1.05;
+    const bars = rows.map(x => `<div class="row" style="--namew:104px"><div class="name ${x.p === "adaptive" ? "hl" : ""}">${x.p}</div><div class="track"><div class="fill ${x.p === "adaptive" ? "" : ""}" data-w="${(x.v / mx * 100).toFixed(1)}" style="background:${PCOL[x.p]};${x.p === "adaptive" ? "color:var(--bg)" : ""}" data-tip="<b>${x.p}</b><br>p99 ${f2(x.v)} s ± ${f2(x.ci)}">${f1(x.v)} s</div>
+      <div style="position:absolute;left:${((x.v - x.ci) / mx * 100).toFixed(1)}%;width:${(2 * x.ci / mx * 100).toFixed(1)}%;top:11px;height:4px;border-top:2px solid var(--ink2);border-left:2px solid var(--ink2);border-right:2px solid var(--ink2);opacity:.7"></div></div></div>`).join("");
+    const card = h("div", { class: "card vcard reveal" }); card.innerHTML = `<span class="stamp">REJECTED</span><h3>${r.pattern.replace("_", " ")}</h3><div class="pct">${pctS(r.pct_change)}</div><div class="note" style="margin:0 0 14px">adaptive p99 vs best fixed (${r.best_fixed})</div><div class="bars">${bars}</div>
+      <div class="facts"><span>Holm <b>p=${r.p_holm.toFixed(3)}</b></span><span>effect <b>d=${r.cohens_dz.toFixed(1)}</b></span><span>throughput <b>${f2(r.throughput_ratio)}×</b></span><span><b>${r.n_pairs}</b> paired reps</span></div>`; box.append(card);
+    requestAnimationFrame(() => requestAnimationFrame(() => card.querySelectorAll(".fill[data-w]").forEach(f => f.style.width = f.dataset.w + "%"))); });
+  let t2 = `<table><tr><th>pattern</th><th>policy</th><th>p99 (s)</th><th>p50 (s)</th><th>tok/s</th><th>tok/J</th></tr>`;
+  C.patterns.forEach(pn => pols.forEach(p => { const c = C.cells[pn] && C.cells[pn][p]; if (c) t2 += `<tr><td>${pn}</td><td>${p}</td><td>${f2(c.p99)} ± ${f2(c.p99_ci)}</td><td>${f2(c.p50)}</td><td>${f0(c.thr)}</td><td>${f1(c.tpj)}</td></tr>`; }));
+  $("#vtable").innerHTML = t2 + "</table><p class='note'>Mean ± 95% CI over 8 repetitions.</p>";
+} else hide("#verdict");
+
+/* ---------- twist ---------- */
+if (X && contRatios.length) {
+  const avg = a => a.reduce((x, y) => x + y, 0) / a.length;
+  $("#cont-big").textContent = f1(avg(contRatios)) + "×";
+  $("#twist-sub").textContent = `Holding total load fixed at 30% and 60% of measured capacity, the only thing that changed was how the GPU is shared. A resident but idle second replica cost ${contIdle.map(v => pctS((v - 1) * 100)).join(" and ")} in p99. Making it active multiplied p99 by ${contRatios.map(v => f2(v) + "×").join(" and ")}.`;
+  const bars = ["single", "split-idle", "split-active"], col = { single: "var(--s1)", "split-idle": "var(--s2)", "split-active": "var(--s3)" }, pats = ["rho0.3", "rho0.6"];
+  const g = X.cells, mx = Math.max(...g.map(c => c.e2e_p99 + c.e2e_p99_ci)) * 1.12, hgt = 200, bw = 44, gap = 14, gw = bars.length * (bw + gap);
+  let s = `<svg viewBox="0 0 ${pats.length * (gw + 60) + 40} ${hgt}" role="img" aria-label="p99 latency by GPU sharing condition"><line x1="30" x2="${pats.length * (gw + 60) + 30}" y1="${hgt - 30}" y2="${hgt - 30}" stroke="var(--axis)"/>`;
+  pats.forEach((p, gi) => { const x0 = 40 + gi * (gw + 60); bars.forEach((b, bi) => { const c = g.find(z => z.pattern === p && z.config === b); if (!c) return; const hh = c.e2e_p99 / mx * (hgt - 60), x = x0 + bi * (bw + gap);
+    s += `<rect x="${x}" y="${hgt - 30 - hh}" width="${bw}" height="${hh}" rx="6" fill="${col[b]}" data-tip="<b>${b}</b> at ${p.replace("rho", "")}× capacity<br>p99 ${f2(c.e2e_p99)} s ± ${f2(c.e2e_p99_ci)}"/><text x="${x + bw / 2}" y="${hgt - 36 - hh}" text-anchor="middle" style="fill:var(--ink);font-weight:700;font-size:12px">${f1(c.e2e_p99)}</text>`; });
+    s += `<text x="${x0 + gw / 2 - gap / 2}" y="${hgt - 10}" text-anchor="middle">load ${p.replace("rho", "")}× capacity</text>`; });
+  $("#c-cont").innerHTML = `<div class="legend">${bars.map(b => `<span><i style="border-color:${col[b]}"></i>${b}</span>`).join("")}</div>` + s + "</svg>";
+  const eff = X.cells.filter(c => c.pattern === "rho0.6"), tp = c => eff.find(z => z.config === c).tokens_per_joule;
+  $("#cont-callout").innerHTML = `<b>Mechanism.</b> Two active processes time-slice the GPU and each runs smaller batches. At 60% load throughput fell and tokens per joule dropped ${Math.round((1 - tp("split-active") / tp("split-idle")) * 100)}%.`;
+  $("#cont-impl").innerHTML = `<b>Design implication.</b> Replica-level adaptivity needs one replica per GPU. That is why the adaptive router and the static load balancer both lost on this hardware, and it is the experiment the cloud configs are written for.`;
+} else hide("#twist");
+
+/* ---------- more findings ---------- */
+function lineMini(el, series, o) {
+  const w = 360, hh = 190, m = { l: 40, r: 10, t: 10, b: 30 }, xs = series.flatMap(s => s.pts.map(p => p[0])), ys = series.flatMap(s => s.pts.map(p => p[1] + (p[2] || 0)));
+  const xl = o.xlog, X0 = xl ? Math.log2(Math.min(...xs)) : Math.min(...xs), X1 = xl ? Math.log2(Math.max(...xs)) : Math.max(...xs), Y1 = Math.max(...ys) * 1.08;
+  const x = v => sc(X0, X1, m.l, w - m.r)(xl ? Math.log2(v) : v), y = sc(0, Y1, hh - m.b, m.t);
+  let s = `<svg viewBox="0 0 ${w} ${hh}" role="img" aria-label="${o.label}">`;
+  for (let i = 0; i <= 3; i++) { const v = Y1 * i / 3; s += `<line x1="${m.l}" x2="${w - m.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${m.l - 6}" y="${y(v) + 4}" text-anchor="end">${o.yfmt ? o.yfmt(v) : Math.round(v)}</text>`; }
+  [...new Set(xs)].forEach(v => s += `<text x="${x(v)}" y="${hh - 8}" text-anchor="middle">${o.xfmt ? o.xfmt(v) : v}</text>`);
+  series.forEach(se => { s += `<path d="${se.pts.map((p, i) => (i ? "L" : "M") + x(p[0]).toFixed(1) + " " + y(p[1]).toFixed(1)).join("")}" fill="none" stroke="${se.color}" stroke-width="2.2"/>`;
+    se.pts.forEach(p => s += `<circle cx="${x(p[0])}" cy="${y(p[1])}" r="4.5" fill="${se.color}" stroke="var(--bg)" stroke-width="2" data-tip="${p[3] || ""}"/>`); });
+  el.innerHTML = s + "</svg>";
+}
+(function more() {
+  const S = D.sweep; if (S) { const q = { fp16: "var(--s1)", int8: "var(--s2)", int4: "var(--s3)" };
+    $("#sweep-legend").innerHTML = Object.keys(q).map(k => `<span><i style="border-color:${q[k]}"></i>${k}</span>`).join("");
+    lineMini($("#c-sweep"), Object.keys(q).map(k => ({ color: q[k], pts: S.filter(r => r.quant === k).sort((a, b) => a.bs - b.bs).map(r => [r.bs, r.tpj, r.tpj_ci, `<b>${k}, cap ${r.bs}</b><br>${f1(r.tpj)} tokens/J<br>${f0(r.thr)} tok/s · p50 ${f1(r.p50)} s<br>${Math.round(r.done * 100)}% completed`]) })), { xlog: true, label: "Tokens per joule by batch cap", yfmt: v => Math.round(v), xfmt: v => v });
+    const a = S.find(r => r.config === "fp16-bs64"), b = S.find(r => r.config === "int4-bs64");
+    if (a && b) $("#sweep-note").textContent = `Energy efficiency (tokens/J) vs batch cap. At the same load, int4 halves median latency (${f1(a.p50)} s to ${f1(b.p50)} s) and gains ${Math.round((b.tpj / a.tpj - 1) * 100)}% tokens per joule over fp16.`;
+    const colds = S.map(r => r.cold).filter(v => v < 100).sort((x, y) => x - y), cold = colds.length % 2 ? colds[(colds.length - 1) / 2] : (colds[colds.length / 2 - 1] + colds[colds.length / 2]) / 2;
+    $("#more-stats").append(h("div", { class: "stat" }, h("div", { class: "n" }, Math.round(cold) + " s"), h("div", { class: "t" }, "to reconfigure a vLLM server (batch size or quantization), against a 10 s traffic burst. Hence pre-loaded replicas.")));
+    const tl = h("div", { class: "timeline", "aria-label": "Reconfiguration versus burst duration" }); tl.append(h("div", { class: "seg1", style: `width:${Math.min(100, 10 / cold * 100)}%;background:var(--s2)`, "data-tip": "10 s burst" })); tl.append(h("div", { class: "seg1", style: `left:${Math.min(100, 10 / cold * 100)}%;right:0;background:var(--bad);opacity:.45`, "data-tip": `${Math.round(cold)} s reload` }));
+    $("#more-stats").lastChild.append(tl); }
+  const M2 = D.mpi; if (M2 && M2.pingpong) {
+    lineMini($("#c-mpi"), [{ color: "var(--s3)", pts: M2.pingpong.map(r => [r.bytes, r.one_way_us_est, 0, `<b>${r.bytes} B</b><br>${r.one_way_us_est.toFixed(1)} µs one way`]) }], { xlog: true, label: "MPI one-way latency vs message size", yfmt: v => Math.round(v), xfmt: v => v >= 1024 ? (v / 1024) + "K" : v });
+    const d = M2.dispatch; $("#mpi-note").textContent = `One-way latency by message size (µs). Dispatch sustains ${Math.round(d[0].jobs_per_s / 1000)}k jobs/s with 1 worker and ${Math.round(d[d.length - 1].jobs_per_s / 1000)}k with ${d[d.length - 1].workers}, thousands of times faster than LLM requests arrive.`; }
+  if (M2 && M2.scaling) { const c = Object.fromEntries(M2.scaling.cells.map(z => [z.router + z.replicas, z])); const mv = M2.scaling.mv.filter(z => z.metric === "throughput_tok_per_s");
+    const rows = [["1 replica", c.http1], ["2 replicas", c.http2]].filter(r => r[1]), mx = Math.max(...rows.map(r => r[1].throughput)) * 1.1;
+    $("#c-scal").innerHTML = `<div class="bars">${rows.map(r => `<div class="row" style="--namew:86px"><div class="name">${r[0]}</div><div class="track"><div class="fill" data-w="${(r[1].throughput / mx * 100).toFixed(1)}" style="background:var(--s1)">${f0(r[1].throughput)} tok/s</div></div></div>`).join("")}</div>`;
+    requestAnimationFrame(() => requestAnimationFrame(() => $("#c-scal").querySelectorAll(".fill").forEach(f => f.style.width = f.dataset.w + "%")));
+    if (c.http2) $("#scal-note").textContent = `Two replicas reach ${f2(c.http2.efficiency_vs_1x)} of ideal linear scaling on one GPU: throughput falls. MPI vs HTTP routing differed by ${mv.map(z => (z.pct_diff_mpi_vs_http >= 0 ? "+" : "") + z.pct_diff_mpi_vs_http.toFixed(2) + "%").join(" and ")}, within noise.`; }
+  if (!S && !M2) hide("#more");
+})();
+
+if (/[?&]debug/.test(location.search)) addEventListener("load", () => setTimeout(() => { document.title = "sw=" + document.documentElement.scrollWidth + " iw=" + innerWidth; }, 400));
+function rerender() { if (K) { renderKernel(); } drawReplay(); }
+</script>
+</body>
+</html>

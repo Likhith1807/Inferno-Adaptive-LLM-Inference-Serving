@@ -1,0 +1,40 @@
+arrival_process: "poisson"
+
+duration_sec: 120       # length of each measured run
+warmup_sec: 10          # requests scheduled before this are excluded from stats
+drain_timeout_sec: 60   # sweep/baseline runs: unfinished requests this long after the last arrival count as failures
+
+load_patterns:
+  steady:
+    rate_requests_per_sec: 4.0
+  bursty:
+    base_rate_requests_per_sec: 1.5
+    burst_rate_requests_per_sec: 16.0
+    burst_duration_sec: 10
+    burst_interval_sec: 40
+  mixed_length:
+    rate_requests_per_sec: 4.0
+    # Bimodal mix: mostly short chat turns plus a heavy tail of long-context requests.
+    # Each component: prompt/output lognormal parameters (median tokens, sigma).
+    length_mixture:
+      - { weight: 0.85, prompt_tokens_mean: 96,  prompt_tokens_sigma: 0.6, max_new_tokens_mean: 128, max_new_tokens_sigma: 0.5 }
+      - { weight: 0.15, prompt_tokens_mean: 900, prompt_tokens_sigma: 0.4, max_new_tokens_mean: 384, max_new_tokens_sigma: 0.4 }
+
+request_length:
+  # "lognormal" = synthetic placeholder; "empirical" = resample (prompt, output)
+  # pairs from a trace built by scripts/prepare_trace.py (ShareGPT-style).
+  distribution: "lognormal"
+  trace_path: "data/sharegpt_lengths.csv"
+  prompt_tokens_mean: 128
+  prompt_tokens_sigma: 0.8
+  max_new_tokens_mean: 256
+  max_new_tokens_sigma: 0.6
+  max_prompt_tokens: 1536       # keep prompt + output inside max_model_len
+  max_new_tokens_cap: 512
+
+# Service-level objective used to define goodput (requests meeting BOTH bounds)
+slo:
+  ttft_sec: 0.5
+  tpot_sec: 0.05
+
+random_seed: 42

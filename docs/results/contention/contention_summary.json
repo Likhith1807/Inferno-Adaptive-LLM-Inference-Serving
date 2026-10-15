@@ -1,0 +1,216 @@
+{
+  "cells": [
+    {
+      "pattern": "rho0.3",
+      "config": "single",
+      "n": 5,
+      "e2e_p99": 4.456803310142717,
+      "e2e_p99_ci": 0.1252646353091844,
+      "ttft_p50": 0.02872138856045116,
+      "ttft_p50_ci": 0.000626632063851211,
+      "throughput_tok_per_s": 828.1763543644323,
+      "throughput_tok_per_s_ci": 106.26883665493096,
+      "tokens_per_joule": 10.85874695855751,
+      "tokens_per_joule_ci": 1.3318197436688042
+    },
+    {
+      "pattern": "rho0.3",
+      "config": "split-active",
+      "n": 5,
+      "e2e_p99": 9.251958009240079,
+      "e2e_p99_ci": 0.17095248753575198,
+      "ttft_p50": 0.044929517508193004,
+      "ttft_p50_ci": 0.001432390239189979,
+      "throughput_tok_per_s": 792.0477045534114,
+      "throughput_tok_per_s_ci": 101.99256009159592,
+      "tokens_per_joule": 10.060235912442508,
+      "tokens_per_joule_ci": 1.1694613669158898
+    },
+    {
+      "pattern": "rho0.3",
+      "config": "split-idle",
+      "n": 5,
+      "e2e_p99": 4.490260933280498,
+      "e2e_p99_ci": 0.14556692677323912,
+      "ttft_p50": 0.028831720417773342,
+      "ttft_p50_ci": 0.00045762142743185213,
+      "throughput_tok_per_s": 827.773257052629,
+      "throughput_tok_per_s_ci": 105.937571769731,
+      "tokens_per_joule": 10.935873957543418,
+      "tokens_per_joule_ci": 1.3498245130842736
+    },
+    {
+      "pattern": "rho0.6",
+      "config": "single",
+      "n": 5,
+      "e2e_p99": 6.207031547987005,
+      "e2e_p99_ci": 0.6022880416645293,
+      "ttft_p50": 0.035501713928732095,
+      "ttft_p50_ci": 0.0010265551022761443,
+      "throughput_tok_per_s": 1595.4714239866344,
+      "throughput_tok_per_s_ci": 55.19733917075882,
+      "tokens_per_joule": 20.016272413387913,
+      "tokens_per_joule_ci": 0.6977252282711497
+    },
+    {
+      "pattern": "rho0.6",
+      "config": "split-active",
+      "n": 5,
+      "e2e_p99": 13.016520704558895,
+      "e2e_p99_ci": 0.7924322789594545,
+      "ttft_p50": 0.05797868169503935,
+      "ttft_p50_ci": 0.0019703629556205374,
+      "throughput_tok_per_s": 1504.8718363581588,
+      "throughput_tok_per_s_ci": 57.10684057127264,
+      "tokens_per_joule": 18.216991129042878,
+      "tokens_per_joule_ci": 0.6806266700460135
+    },
+    {
+      "pattern": "rho0.6",
+      "config": "split-idle",
+      "n": 5,
+      "e2e_p99": 6.2604480976189185,
+      "e2e_p99_ci": 0.6707106093679114,
+      "ttft_p50": 0.03544142147368344,
+      "ttft_p50_ci": 0.0010232109616593599,
+      "throughput_tok_per_s": 1594.9836493538355,
+      "throughput_tok_per_s_ci": 54.693914418152644,
+      "tokens_per_joule": 20.06589759285551,
+      "tokens_per_joule_ci": 0.6840856027156157
+    }
+  ],
+  "comparisons": [
+    {
+      "pattern": "rho0.3",
+      "comparison": "split-idle vs single",
+      "metric": "e2e_p99",
+      "n_pairs": 5,
+      "a_mean": 4.490260933280498,
+      "b_mean": 4.456803310142717,
+      "ratio_a_over_b": 1.007507089904919,
+      "p_ttest": 0.02154393860941862,
+      "p_wilcoxon": 0.0625
+    },
+    {
+      "pattern": "rho0.3",
+      "comparison": "split-idle vs single",
+      "metric": "throughput_tok_per_s",
+      "n_pairs": 5,
+      "a_mean": 827.773257052629,
+      "b_mean": 828.1763543644323,
+      "ratio_a_over_b": 0.9995132711653997,
+      "p_ttest": 0.1653209526069636,
+      "p_wilcoxon": 0.1875
+    },
+    {
+      "pattern": "rho0.3",
+      "comparison": "split-idle vs single",
+      "metric": "tokens_per_joule",
+      "n_pairs": 5,
+      "a_mean": 10.935873957543418,
+      "b_mean": 10.85874695855751,
+      "ratio_a_over_b": 1.007102753133512,
+      "p_ttest": 0.03021410186461297,
+      "p_wilcoxon": 0.125
+    },
+    {
+      "pattern": "rho0.3",
+      "comparison": "split-active vs split-idle",
+      "metric": "e2e_p99",
+      "n_pairs": 5,
+      "a_mean": 9.251958009240079,
+      "b_mean": 4.490260933280498,
+      "ratio_a_over_b": 2.060449970884159,
+      "p_ttest": 8.18277740151125e-09,
+      "p_wilcoxon": 0.0625
+    },
+    {
+      "pattern": "rho0.3",
+      "comparison": "split-active vs split-idle",
+      "metric": "throughput_tok_per_s",
+      "n_pairs": 5,
+      "a_mean": 792.0477045534114,
+      "b_mean": 827.773257052629,
+      "ratio_a_over_b": 0.9568413787292163,
+      "p_ttest": 0.0006876538972572009,
+      "p_wilcoxon": 0.0625
+    },
+    {
+      "pattern": "rho0.3",
+      "comparison": "split-active vs split-idle",
+      "metric": "tokens_per_joule",
+      "n_pairs": 5,
+      "a_mean": 10.060235912442508,
+      "b_mean": 10.935873957543418,
+      "ratio_a_over_b": 0.9199297606665532,
+      "p_ttest": 0.00029795232688106256,
+      "p_wilcoxon": 0.0625
+    },
+    {
+      "pattern": "rho0.6",
+      "comparison": "split-idle vs single",
+      "metric": "e2e_p99",
+      "n_pairs": 5,
+      "a_mean": 6.2604480976189185,
+      "b_mean": 6.207031547987005,
+      "ratio_a_over_b": 1.0086058124916792,
+      "p_ttest": 0.24169630017271213,
+      "p_wilcoxon": 0.4375
+    },
+    {
+      "pattern": "rho0.6",
+      "comparison": "split-idle vs single",
+      "metric": "throughput_tok_per_s",
+      "n_pairs": 5,
+      "a_mean": 1594.9836493538355,
+      "b_mean": 1595.4714239866344,
+      "ratio_a_over_b": 0.9996942755442275,
+      "p_ttest": 0.07276737643184396,
+      "p_wilcoxon": 0.0625
+    },
+    {
+      "pattern": "rho0.6",
+      "comparison": "split-idle vs single",
+      "metric": "tokens_per_joule",
+      "n_pairs": 5,
+      "a_mean": 20.06589759285551,
+      "b_mean": 20.016272413387913,
+      "ratio_a_over_b": 1.002479241810998,
+      "p_ttest": 0.03821157823431989,
+      "p_wilcoxon": 0.0625
+    },
+    {
+      "pattern": "rho0.6",
+      "comparison": "split-active vs split-idle",
+      "metric": "e2e_p99",
+      "n_pairs": 5,
+      "a_mean": 13.016520704558895,
+      "b_mean": 6.2604480976189185,
+      "ratio_a_over_b": 2.0791675773990623,
+      "p_ttest": 1.0856251884584728e-07,
+      "p_wilcoxon": 0.0625
+    },
+    {
+      "pattern": "rho0.6",
+      "comparison": "split-active vs split-idle",
+      "metric": "throughput_tok_per_s",
+      "n_pairs": 5,
+      "a_mean": 1504.8718363581588,
+      "b_mean": 1594.9836493538355,
+      "ratio_a_over_b": 0.9435029863583975,
+      "p_ttest": 0.00020590904076041007,
+      "p_wilcoxon": 0.0625
+    },
+    {
+      "pattern": "rho0.6",
+      "comparison": "split-active vs split-idle",
+      "metric": "tokens_per_joule",
+      "n_pairs": 5,
+      "a_mean": 18.216991129042878,
+      "b_mean": 20.06589759285551,
+      "ratio_a_over_b": 0.9078582727108635,
+      "p_ttest": 4.351854605309027e-06,
+      "p_wilcoxon": 0.0625
+    }
+  ]
+}

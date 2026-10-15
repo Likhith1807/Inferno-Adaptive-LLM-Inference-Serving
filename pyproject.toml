@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "inferno"
+version = "0.1.0"
+description = "Adaptive LLM Inference Optimization Lab"
+requires-python = ">=3.10"
+authors = [{ name = "Karthikeya" }]
+license = { text = "MIT" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.black]
+line-length = 100

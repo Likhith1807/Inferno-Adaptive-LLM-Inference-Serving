@@ -1,0 +1,71 @@
+{
+  "device": "NVIDIA GeForce RTX 4060 Laptop GPU", "peak_dram_gbps": 256.0, "stream_read_gbps": 251.6, "l2_mb": 32.0, "group_size": 128,
+  "shapes": [
+    {"name": "qwen1.5B_qkv       (N=2048,K=1536)", "N": 2048, "K": 1536, "int4_bytes": 1671168, "fp16_bytes": 6291456, "kernels": [
+      {"kernel": "cublas_fp16", "us_median": 28.933, "us_p10": 28.406, "us_p90": 30.126, "gbps": 217.70, "pct_peak": 85.03, "max_rel_err": 3.644e-04, "correct": true},
+      {"kernel": "unfused_naive", "us_median": 63.058, "us_p10": 62.874, "us_p90": 63.754, "gbps": 226.16, "pct_peak": 88.33, "max_rel_err": 3.644e-04, "correct": true},
+      {"kernel": "int4_v0_naive", "us_median": 91.034, "us_p10": 81.736, "us_p90": 91.791, "gbps": 18.44, "pct_peak": 7.20, "max_rel_err": 2.936e-04, "correct": true},
+      {"kernel": "int4_v1_warp", "us_median": 14.582, "us_p10": 13.619, "us_p90": 22.508, "gbps": 115.10, "pct_peak": 44.95, "max_rel_err": 2.936e-04, "correct": true},
+      {"kernel": "int4_v2_vec", "us_median": 14.437, "us_p10": 13.962, "us_p90": 17.367, "gbps": 116.25, "pct_peak": 45.41, "max_rel_err": 2.936e-04, "correct": true},
+      {"kernel": "int4_v3_pad", "us_median": 14.828, "us_p10": 13.865, "us_p90": 22.428, "gbps": 113.19, "pct_peak": 44.21, "max_rel_err": 2.936e-04, "correct": true},
+      {"kernel": "int4_v4_alg", "us_median": 14.725, "us_p10": 14.029, "us_p90": 20.889, "gbps": 113.98, "pct_peak": 44.52, "max_rel_err": 2.936e-04, "correct": true},
+      {"kernel": "int4_v5_reuse", "us_median": 14.824, "us_p10": 13.087, "us_p90": 16.895, "gbps": 113.22, "pct_peak": 44.22, "max_rel_err": 2.936e-04, "correct": true},
+      {"kernel": "int4_v6_lane16", "us_median": 13.271, "us_p10": 12.677, "us_p90": 14.172, "gbps": 126.47, "pct_peak": 49.39, "max_rel_err": 2.936e-04, "correct": true}
+    ]},
+    {"name": "qwen1.5B_o_proj    (N=1536,K=1536)", "N": 1536, "K": 1536, "int4_bytes": 1253376, "fp16_bytes": 4718592, "kernels": [
+      {"kernel": "cublas_fp16", "us_median": 24.166, "us_p10": 23.081, "us_p90": 28.790, "gbps": 195.51, "pct_peak": 76.36, "max_rel_err": 3.790e-04, "correct": true},
+      {"kernel": "unfused_naive", "us_median": 44.994, "us_p10": 44.810, "us_p90": 48.616, "gbps": 237.74, "pct_peak": 92.85, "max_rel_err": 3.790e-04, "correct": true},
+      {"kernel": "int4_v0_naive", "us_median": 81.674, "us_p10": 81.510, "us_p90": 82.944, "gbps": 15.42, "pct_peak": 6.02, "max_rel_err": 2.366e-04, "correct": true},
+      {"kernel": "int4_v1_warp", "us_median": 13.926, "us_p10": 13.148, "us_p90": 15.892, "gbps": 90.44, "pct_peak": 35.32, "max_rel_err": 2.365e-04, "correct": true},
+      {"kernel": "int4_v2_vec", "us_median": 14.397, "us_p10": 13.681, "us_p90": 15.892, "gbps": 87.48, "pct_peak": 34.17, "max_rel_err": 2.365e-04, "correct": true},
+      {"kernel": "int4_v3_pad", "us_median": 13.783, "us_p10": 13.353, "us_p90": 21.051, "gbps": 91.38, "pct_peak": 35.69, "max_rel_err": 2.365e-04, "correct": true},
+      {"kernel": "int4_v4_alg", "us_median": 14.191, "us_p10": 12.780, "us_p90": 16.282, "gbps": 88.75, "pct_peak": 34.66, "max_rel_err": 2.365e-04, "correct": true},
+      {"kernel": "int4_v5_reuse", "us_median": 12.452, "us_p10": 12.124, "us_p90": 13.962, "gbps": 101.15, "pct_peak": 39.51, "max_rel_err": 2.365e-04, "correct": true},
+      {"kernel": "int4_v6_lane16", "us_median": 11.156, "us_p10": 10.568, "us_p90": 12.411, "gbps": 112.90, "pct_peak": 44.09, "max_rel_err": 2.365e-04, "correct": true}
+    ]},
+    {"name": "qwen1.5B_gate_up   (N=17920,K=1536)", "N": 17920, "K": 1536, "int4_bytes": 14622720, "fp16_bytes": 55050240, "kernels": [
+      {"kernel": "cublas_fp16", "us_median": 221.655, "us_p10": 221.488, "us_p90": 222.433, "gbps": 248.54, "pct_peak": 97.07, "max_rel_err": 4.346e-04, "correct": true},
+      {"kernel": "unfused_naive", "us_median": 614.748, "us_p10": 614.543, "us_p90": 615.399, "gbps": 202.95, "pct_peak": 79.27, "max_rel_err": 4.346e-04, "correct": true},
+      {"kernel": "int4_v0_naive", "us_median": 201.974, "us_p10": 201.830, "us_p90": 202.895, "gbps": 72.59, "pct_peak": 28.35, "max_rel_err": 3.974e-04, "correct": true},
+      {"kernel": "int4_v1_warp", "us_median": 70.062, "us_p10": 69.916, "us_p90": 70.984, "gbps": 209.27, "pct_peak": 81.73, "max_rel_err": 3.974e-04, "correct": true},
+      {"kernel": "int4_v2_vec", "us_median": 75.141, "us_p10": 74.998, "us_p90": 75.836, "gbps": 195.12, "pct_peak": 76.21, "max_rel_err": 3.974e-04, "correct": true},
+      {"kernel": "int4_v3_pad", "us_median": 68.157, "us_p10": 68.076, "us_p90": 68.219, "gbps": 215.11, "pct_peak": 84.02, "max_rel_err": 3.974e-04, "correct": true},
+      {"kernel": "int4_v4_alg", "us_median": 79.974, "us_p10": 79.852, "us_p90": 80.937, "gbps": 183.33, "pct_peak": 71.60, "max_rel_err": 3.974e-04, "correct": true},
+      {"kernel": "int4_v5_reuse", "us_median": 65.000, "us_p10": 64.773, "us_p90": 65.761, "gbps": 225.56, "pct_peak": 88.10, "max_rel_err": 3.974e-04, "correct": true},
+      {"kernel": "int4_v6_lane16", "us_median": 61.420, "us_p10": 61.358, "us_p90": 61.544, "gbps": 238.71, "pct_peak": 93.24, "max_rel_err": 3.974e-04, "correct": true}
+    ]},
+    {"name": "qwen1.5B_down      (N=1536,K=8960)", "N": 1536, "K": 8960, "int4_bytes": 7311360, "fp16_bytes": 27525120, "kernels": [
+      {"kernel": "cublas_fp16", "us_median": 113.357, "us_p10": 113.188, "us_p90": 114.236, "gbps": 243.00, "pct_peak": 94.91, "max_rel_err": 2.683e-04, "correct": true},
+      {"kernel": "unfused_naive", "us_median": 268.882, "us_p10": 268.718, "us_p90": 269.373, "gbps": 232.01, "pct_peak": 90.62, "max_rel_err": 2.683e-04, "correct": true},
+      {"kernel": "int4_v0_naive", "us_median": 704.403, "us_p10": 703.775, "us_p90": 705.471, "gbps": 10.41, "pct_peak": 4.07, "max_rel_err": 2.651e-04, "correct": true},
+      {"kernel": "int4_v1_warp", "us_median": 41.759, "us_p10": 41.656, "us_p90": 41.861, "gbps": 175.59, "pct_peak": 68.58, "max_rel_err": 2.651e-04, "correct": true},
+      {"kernel": "int4_v2_vec", "us_median": 41.820, "us_p10": 41.656, "us_p90": 42.496, "gbps": 175.33, "pct_peak": 68.48, "max_rel_err": 2.651e-04, "correct": true},
+      {"kernel": "int4_v3_pad", "us_median": 39.567, "us_p10": 39.500, "us_p90": 39.912, "gbps": 185.31, "pct_peak": 72.38, "max_rel_err": 2.651e-04, "correct": true},
+      {"kernel": "int4_v4_alg", "us_median": 48.185, "us_p10": 48.087, "us_p90": 48.251, "gbps": 152.17, "pct_peak": 59.43, "max_rel_err": 2.651e-04, "correct": true},
+      {"kernel": "int4_v5_reuse", "us_median": 33.444, "us_p10": 33.321, "us_p90": 34.017, "gbps": 219.24, "pct_peak": 85.63, "max_rel_err": 2.651e-04, "correct": true},
+      {"kernel": "int4_v6_lane16", "us_median": 32.993, "us_p10": 32.929, "us_p90": 33.112, "gbps": 222.24, "pct_peak": 86.80, "max_rel_err": 2.651e-04, "correct": true}
+    ]},
+    {"name": "llama7B_attn_proj  (N=4096,K=4096)", "N": 4096, "K": 4096, "int4_bytes": 8912896, "fp16_bytes": 33554432, "kernels": [
+      {"kernel": "cublas_fp16", "us_median": 136.458, "us_p10": 136.438, "us_p90": 136.540, "gbps": 246.02, "pct_peak": 96.09, "max_rel_err": 2.902e-04, "correct": true},
+      {"kernel": "unfused_naive", "us_median": 350.146, "us_p10": 350.044, "us_p90": 350.469, "gbps": 217.16, "pct_peak": 84.82, "max_rel_err": 2.902e-04, "correct": true},
+      {"kernel": "int4_v0_naive", "us_median": 486.216, "us_p10": 486.093, "us_p90": 486.359, "gbps": 18.36, "pct_peak": 7.17, "max_rel_err": 2.472e-04, "correct": true},
+      {"kernel": "int4_v1_warp", "us_median": 44.913, "us_p10": 44.851, "us_p90": 45.117, "gbps": 198.81, "pct_peak": 77.65, "max_rel_err": 2.472e-04, "correct": true},
+      {"kernel": "int4_v2_vec", "us_median": 46.222, "us_p10": 46.121, "us_p90": 46.364, "gbps": 193.18, "pct_peak": 75.45, "max_rel_err": 2.472e-04, "correct": true},
+      {"kernel": "int4_v3_pad", "us_median": 41.902, "us_p10": 41.738, "us_p90": 42.250, "gbps": 213.10, "pct_peak": 83.23, "max_rel_err": 2.472e-04, "correct": true},
+      {"kernel": "int4_v4_alg", "us_median": 41.472, "us_p10": 41.349, "us_p90": 41.759, "gbps": 215.31, "pct_peak": 84.09, "max_rel_err": 2.472e-04, "correct": true},
+      {"kernel": "int4_v5_reuse", "us_median": 38.810, "us_p10": 38.748, "us_p90": 38.888, "gbps": 230.08, "pct_peak": 89.86, "max_rel_err": 2.472e-04, "correct": true},
+      {"kernel": "int4_v6_lane16", "us_median": 38.851, "us_p10": 38.769, "us_p90": 38.931, "gbps": 229.84, "pct_peak": 89.77, "max_rel_err": 2.472e-04, "correct": true}
+    ]},
+    {"name": "llama7B_mlp_up     (N=11008,K=4096)", "N": 11008, "K": 4096, "int4_bytes": 23953408, "fp16_bytes": 90177536, "kernels": [
+      {"kernel": "cublas_fp16", "us_median": 360.755, "us_p10": 360.629, "us_p90": 362.148, "gbps": 250.05, "pct_peak": 97.66, "max_rel_err": 3.399e-04, "correct": true},
+      {"kernel": "unfused_naive", "us_median": 1042.596, "us_p10": 1042.309, "us_p90": 1043.210, "gbps": 195.99, "pct_peak": 76.55, "max_rel_err": 3.399e-04, "correct": true},
+      {"kernel": "int4_v0_naive", "us_median": 970.973, "us_p10": 970.813, "us_p90": 971.753, "gbps": 24.70, "pct_peak": 9.65, "max_rel_err": 2.436e-04, "correct": true},
+      {"kernel": "int4_v1_warp", "us_median": 110.060, "us_p10": 109.978, "us_p90": 110.713, "gbps": 217.91, "pct_peak": 85.11, "max_rel_err": 2.432e-04, "correct": true},
+      {"kernel": "int4_v2_vec", "us_median": 113.254, "us_p10": 113.111, "us_p90": 113.356, "gbps": 211.77, "pct_peak": 82.71, "max_rel_err": 2.432e-04, "correct": true},
+      {"kernel": "int4_v3_pad", "us_median": 101.352, "us_p10": 101.233, "us_p90": 102.052, "gbps": 236.64, "pct_peak": 92.42, "max_rel_err": 2.432e-04, "correct": true},
+      {"kernel": "int4_v4_alg", "us_median": 101.206, "us_p10": 101.069, "us_p90": 101.908, "gbps": 236.98, "pct_peak": 92.56, "max_rel_err": 2.432e-04, "correct": true},
+      {"kernel": "int4_v5_reuse", "us_median": 98.365, "us_p10": 98.300, "us_p90": 99.226, "gbps": 243.82, "pct_peak": 95.23, "max_rel_err": 2.432e-04, "correct": true},
+      {"kernel": "int4_v6_lane16", "us_median": 98.509, "us_p10": 98.422, "us_p90": 99.082, "gbps": 243.47, "pct_peak": 95.09, "max_rel_err": 2.432e-04, "correct": true}
+    ]}
+  ]
+}

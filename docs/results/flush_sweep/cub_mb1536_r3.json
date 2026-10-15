@@ -1,0 +1,8 @@
+{
+  "device": "NVIDIA GeForce RTX 4060 Laptop GPU", "peak_dram_gbps": 256.0, "stream_read_gbps": 251.3, "l2_mb": 32.0, "group_size": 128,
+  "shapes": [
+    {"name": "llama7B_mlp_up     (N=11008,K=4096)", "N": 11008, "K": 4096, "int4_bytes": 23953408, "fp16_bytes": 90177536, "kernels": [
+      {"kernel": "cublas_fp16", "us_median": 360.899, "us_p10": 359.977, "us_p90": 361.077, "gbps": 249.95, "pct_peak": 97.63, "max_rel_err": 3.840e-04, "correct": true}
+    ]}
+  ]
+}

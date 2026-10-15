@@ -1,0 +1,101 @@
+{
+  "model": "Qwen/Qwen2.5-1.5B-Instruct-AWQ",
+  "quantization": "awq",
+  "mode": "graphs",
+  "layers": 28,
+  "target_kernel_substring": "gemm_forward_4bit",
+  "n_target_kernels": 2688,
+  "expected_per_step": 112,
+  "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU",
+  "profiler_events_total": 13131,
+  "profiler_cuda_kernel_events": 12576,
+  "top_kernels_by_total_us": [
+    {
+      "name": "void vllm::awq::gemm_forward_4bit_cuda_m16nXk32<128>(int, int, __half*, int*, __half*, int*, int, int, int, __half*)",
+      "calls": 2688,
+      "total_us": 87251.65299999918
+    },
+    {
+      "name": "std::enable_if<!(false), void>::type internal::gemvx::kernel<int, int, __half, __half, __half, float, false, true, true,",
+      "calls": 24,
+      "total_us": 51329.78100000008
+    },
+    {
+      "name": "void at::native::reduce_kernel<128, 4, at::native::ReduceOp<c10::Half, at::native::func_wrapper_t<c10::Half, at::native:",
+      "calls": 2688,
+      "total_us": 5480.116999999602
+    },
+    {
+      "name": "void flash::flash_fwd_splitkv_kernel<Flash_fwd_kernel_traits<128, 64, 128, 4, false, false, cutlass::half_t, Flash_kerne",
+      "calls": 672,
+      "total_us": 4781.743000000295
+    },
+    {
+      "name": "std::enable_if<(((8)>(0)))&&vllm::_typeConvert<c10::Half>::exists, void>::type vllm::fused_add_rms_norm_kernel<c10::Half",
+      "calls": 1344,
+      "total_us": 2522.9489999998423
+    },
+    {
+      "name": "void flash::flash_fwd_splitkv_combine_kernel<Flash_fwd_kernel_traits<128, 64, 128, 4, false, false, cutlass::half_t, Fla",
+      "calls": 672,
+      "total_us": 2299.839000000251
+    },
+    {
+      "name": "void vllm::act_and_mul_kernel<c10::Half, &(c10::Half vllm::silu_kernel<c10::Half>(c10::Half const&)), true>(c10::Half*, ",
+      "calls": 672,
+      "total_us": 2122.3400000001493
+    },
+    {
+      "name": "void vllm::rotary_embedding_kernel<c10::Half, true>(long const*, c10::Half*, c10::Half*, c10::Half const*, int, long, lo",
+      "calls": 672,
+      "total_us": 1145.1259999996073
+    },
+    {
+      "name": "void vllm::reshape_and_cache_flash_kernel<unsigned short, unsigned short, (vllm::Fp8KVCacheDataType)0>(unsigned short co",
+      "calls": 672,
+      "total_us": 1127.7699999996184
+    },
+    {
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::CUDAFunctor_add<c10::Half>, std::array<char*, 3ul> >(int, ",
+      "calls": 672,
+      "total_us": 770.270000000095
+    },
+    {
+      "name": "memcpy32_post",
+      "calls": 672,
+      "total_us": 621.9819999999945
+    },
+    {
+      "name": "void at::native::vectorized_elementwise_kernel<4, at::native::FillFunctor<c10::Half>, std::array<char*, 1ul> >(int, at::",
+      "calls": 672,
+      "total_us": 586.7179999998516
+    }
+  ],
+  "roles": {
+    "qkv": {
+      "us_median": 12.223499999992782,
+      "us_min": 11.073999999993248,
+      "us_max": 13.857000000047265,
+      "n": 644
+    },
+    "o_proj": {
+      "us_median": 11.360999999989872,
+      "us_min": 10.146000000007916,
+      "us_max": 12.384999999994761,
+      "n": 644
+    },
+    "gate_up": {
+      "us_median": 72.26300000000265,
+      "us_min": 71.14200000002165,
+      "us_max": 78.0229999999865,
+      "n": 644
+    },
+    "down": {
+      "us_median": 41.92349999999715,
+      "us_min": 39.10699999998906,
+      "us_max": 43.65099999998347,
+      "n": 644
+    }
+  },
+  "role_mapping": "by position within layer: qkv, o_proj, gate_up, down"
+}

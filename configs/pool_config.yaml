@@ -1,0 +1,24 @@
+# Heterogeneous replica pool for the routing / adaptive experiments.
+# All replicas are pre-loaded and resident for every policy (fixed baselines included), so every policy
+# sees the same GPU memory situation and contention. Tier 0 = low-latency decode, last tier = throughput
+# and long prefill. Total gpu_memory_utilization must stay <= ~0.75 on an 8 GB card (display stack + vLLM start-up check).
+base_port: 8100
+pool:
+  - name: fast
+    quantization: int4
+    batch_size: 16                 # vLLM --max-num-seqs
+    max_num_batched_tokens: 512    # small prefill chunks: long prompts cannot stall decode for long
+    gpu_memory_utilization: 0.36
+  - name: bulk
+    quantization: int4
+    batch_size: 64
+    max_num_batched_tokens: 4096   # large prefill chunks: fast prefill for long prompts, higher TPOT jitter
+    gpu_memory_utilization: 0.36
+
+adaptive:
+  long_prompt_tokens: 512
+  escalate_util: 0.70
+  deescalate_util: 0.25
+  calm_ticks_required: 5
+  spill_util: 0.90
+  tick_sec: 1.0

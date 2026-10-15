@@ -1,0 +1,29 @@
+{
+  "measured": {
+    "steady": {
+      "tokens_per_s": 1354.2857142857142,
+      "requests_per_s": 4.823251123103945,
+      "completed_in_window": 170,
+      "mean_output_tokens": 280.78275
+    },
+    "mixed_length": {
+      "tokens_per_s": 1273.4,
+      "requests_per_s": 7.124087460565486,
+      "completed_in_window": 261,
+      "mean_output_tokens": 178.7457
+    }
+  },
+  "rates": {
+    "steady": {
+      "rate_requests_per_sec": 2.894
+    },
+    "bursty": {
+      "base_rate_requests_per_sec": 1.688,
+      "burst_rate_requests_per_sec": 7.235
+    },
+    "mixed_length": {
+      "rate_requests_per_sec": 4.274
+    }
+  },
+  "reference": "bulk"
+}

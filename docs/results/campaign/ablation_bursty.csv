@@ -1,0 +1,5 @@
+config,mean,pct_vs_reference,reference
+adaptive,24.29357666448235,0.0,adaptive
+fixed-bulk,11.440967387728282,-52.90538093365567,adaptive
+fixed-fast,20.116379424516893,-17.19465724482059,adaptive
+static-lb,24.243886024382007,-0.20454229851215325,adaptive

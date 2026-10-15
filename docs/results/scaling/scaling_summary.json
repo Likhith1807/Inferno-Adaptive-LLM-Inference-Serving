@@ -1,0 +1,107 @@
+{
+  "cells": [
+    {
+      "router": "http",
+      "replicas": 1,
+      "n": 4,
+      "throughput": 2105.6116136222654,
+      "throughput_ci": 31.009624929199163,
+      "p99": 74.02994930818106,
+      "p99_ci": 7.119865308718943,
+      "errors": 0,
+      "efficiency_vs_1x": 1.0
+    },
+    {
+      "router": "http",
+      "replicas": 2,
+      "n": 4,
+      "throughput": 1980.0258620921588,
+      "throughput_ci": 34.945595991730215,
+      "p99": 82.23757931684284,
+      "p99_ci": 6.628879580654512,
+      "errors": 0,
+      "efficiency_vs_1x": 0.47017831999082144
+    },
+    {
+      "router": "mpi",
+      "replicas": 1,
+      "n": 4,
+      "throughput": 2117.8641579622276,
+      "throughput_ci": 30.988264626514137,
+      "p99": 73.3159062575066,
+      "p99_ci": 7.236537259212653,
+      "errors": 0,
+      "efficiency_vs_1x": 1.0
+    },
+    {
+      "router": "mpi",
+      "replicas": 2,
+      "n": 4,
+      "throughput": 1980.2096083518602,
+      "throughput_ci": 28.533460059221397,
+      "p99": 82.50331239411655,
+      "p99_ci": 8.062146591657665,
+      "errors": 0,
+      "efficiency_vs_1x": 0.46750156305048
+    }
+  ],
+  "mpi_vs_http": [
+    {
+      "replicas": 1,
+      "metric": "throughput_tok_per_s",
+      "n_pairs": 4,
+      "mpi_mean": 2117.8641579622276,
+      "http_mean": 2105.6116136222654,
+      "pct_diff_mpi_vs_http": 0.5818995421897534,
+      "p_ttest": 0.046752287567992615,
+      "p_wilcoxon": 0.125
+    },
+    {
+      "replicas": 1,
+      "metric": "e2e_p99",
+      "n_pairs": 4,
+      "mpi_mean": 73.3159062575066,
+      "http_mean": 74.02994930818106,
+      "pct_diff_mpi_vs_http": -0.9645326754202519,
+      "p_ttest": 0.047887759961906355,
+      "p_wilcoxon": 0.125
+    },
+    {
+      "replicas": 2,
+      "metric": "throughput_tok_per_s",
+      "n_pairs": 4,
+      "mpi_mean": 1980.2096083518602,
+      "http_mean": 1980.0258620921588,
+      "pct_diff_mpi_vs_http": 0.00927999291420284,
+      "p_ttest": 0.9452837181296221,
+      "p_wilcoxon": 1.0
+    },
+    {
+      "replicas": 2,
+      "metric": "e2e_p99",
+      "n_pairs": 4,
+      "mpi_mean": 82.50331239411655,
+      "http_mean": 82.23757931684284,
+      "pct_diff_mpi_vs_http": 0.3231285252814837,
+      "p_ttest": 0.6346684318758997,
+      "p_wilcoxon": 1.0
+    }
+  ],
+  "efficiency": [],
+  "overhead": [
+    {
+      "replicas": 1,
+      "mpi_dispatch_us_p50": 1960.154499997202,
+      "mpi_dispatch_us_p99": 18029.80159002116,
+      "mpi_result_us_p50": 525.4773749960862,
+      "mpi_result_us_p99": 772.1084849961098
+    },
+    {
+      "replicas": 2,
+      "mpi_dispatch_us_p50": 1891.7310000858834,
+      "mpi_dispatch_us_p99": 6338.687577580791,
+      "mpi_result_us_p50": 537.5924999952986,
+      "mpi_result_us_p99": 820.9328600713658
+    }
+  ]
+}

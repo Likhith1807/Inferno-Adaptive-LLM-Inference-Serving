@@ -1,0 +1,145 @@
+{
+  "workload": {
+    "arrival_process": "poisson",
+    "duration_sec": 75.0,
+    "warmup_sec": 10,
+    "load_patterns": {
+      "steady": {
+        "rate_requests_per_sec": 6.043
+      },
+      "bursty": {
+        "base_rate_requests_per_sec": 3.525,
+        "burst_rate_requests_per_sec": 15.108,
+        "burst_duration_sec": 10,
+        "burst_interval_sec": 40
+      },
+      "mixed_length": {
+        "rate_requests_per_sec": 8.27,
+        "length_mixture": [
+          {
+            "weight": 0.85,
+            "prompt_tokens_mean": 96,
+            "prompt_tokens_sigma": 0.6,
+            "max_new_tokens_mean": 128,
+            "max_new_tokens_sigma": 0.5
+          },
+          {
+            "weight": 0.15,
+            "prompt_tokens_mean": 900,
+            "prompt_tokens_sigma": 0.4,
+            "max_new_tokens_mean": 384,
+            "max_new_tokens_sigma": 0.4
+          }
+        ]
+      }
+    },
+    "request_length": {
+      "distribution": "lognormal",
+      "trace_path": "data/sharegpt_lengths.csv",
+      "prompt_tokens_mean": 128,
+      "prompt_tokens_sigma": 0.8,
+      "max_new_tokens_mean": 256,
+      "max_new_tokens_sigma": 0.6,
+      "max_prompt_tokens": 1536,
+      "max_new_tokens_cap": 512
+    },
+    "slo": {
+      "ttft_sec": 0.5,
+      "tpot_sec": 0.05
+    },
+    "random_seed": 42,
+    "calibration": {
+      "reference": "bulk",
+      "rho": 0.6,
+      "measured": {
+        "steady": {
+          "tokens_per_s": 2828.114285714286,
+          "requests_per_s": 10.072250826356981,
+          "completed_in_window": 344,
+          "mean_output_tokens": 280.78275
+        },
+        "mixed_length": {
+          "tokens_per_s": 2463.7428571428572,
+          "requests_per_s": 13.783508398483752,
+          "completed_in_window": 494,
+          "mean_output_tokens": 178.7457
+        }
+      },
+      "note": "rates derived from measured capacity by experiments/calibrate.py"
+    }
+  },
+  "pool": {
+    "base_port": 8100,
+    "pool": [
+      {
+        "name": "fast",
+        "quantization": "int4",
+        "batch_size": 16,
+        "max_num_batched_tokens": 512,
+        "gpu_memory_utilization": 0.36
+      },
+      {
+        "name": "bulk",
+        "quantization": "int4",
+        "batch_size": 64,
+        "max_num_batched_tokens": 4096,
+        "gpu_memory_utilization": 0.36
+      }
+    ],
+    "adaptive": {
+      "long_prompt_tokens": 512,
+      "escalate_util": 0.7,
+      "deescalate_util": 0.25,
+      "calm_ticks_required": 5,
+      "spill_util": 0.9,
+      "tick_sec": 1.0
+    }
+  },
+  "tiers": [
+    {
+      "model_name": "Qwen/Qwen2.5-1.5B-Instruct-AWQ",
+      "quantization": "int4",
+      "batch_size": 16,
+      "max_model_len": 2048,
+      "device": "cuda",
+      "use_custom_kernel": false,
+      "vllm_quantization": "awq_marlin",
+      "host": "127.0.0.1",
+      "port": 8100,
+      "gpu_memory_utilization": 0.36,
+      "startup_timeout_sec": 600,
+      "extra_args": [
+        "--max-num-batched-tokens",
+        "512"
+      ],
+      "tier_name": "fast",
+      "gpu_index": null
+    },
+    {
+      "model_name": "Qwen/Qwen2.5-1.5B-Instruct-AWQ",
+      "quantization": "int4",
+      "batch_size": 64,
+      "max_model_len": 2048,
+      "device": "cuda",
+      "use_custom_kernel": false,
+      "vllm_quantization": "awq_marlin",
+      "host": "127.0.0.1",
+      "port": 8101,
+      "gpu_memory_utilization": 0.36,
+      "startup_timeout_sec": 600,
+      "extra_args": [
+        "--max-num-batched-tokens",
+        "4096"
+      ],
+      "tier_name": "bulk",
+      "gpu_index": null
+    }
+  ],
+  "reps": 8,
+  "patterns": [
+    "steady",
+    "bursty",
+    "mixed_length"
+  ],
+  "order_seed": 7
+}

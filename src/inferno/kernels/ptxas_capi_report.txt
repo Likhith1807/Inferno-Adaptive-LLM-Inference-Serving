@@ -1,0 +1,141 @@
+ptxas info    : 0 bytes gmem
+ptxas info    : Compiling entry function '_ZN7inferno14gemv_int4_laneILi16ELi16ELi1EEEvPKjPK6__halfS5_S5_PS3_iii' for 'sm_89'
+ptxas info    : Function properties for _ZN7inferno14gemv_int4_laneILi16ELi16ELi1EEEvPKjPK6__halfS5_S5_PS3_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 100 registers, 404 bytes cmem[0], 8 bytes cmem[2]
+ptxas info    : Compiling entry function '_ZN7inferno14gemv_int4_laneILi12ELi16ELi1EEEvPKjPK6__halfS5_S5_PS3_iii' for 'sm_89'
+ptxas info    : Function properties for _ZN7inferno14gemv_int4_laneILi12ELi16ELi1EEEvPKjPK6__halfS5_S5_PS3_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 90 registers, 404 bytes cmem[0], 8 bytes cmem[2]
+ptxas info    : Compiling entry function '_ZN7inferno14gemv_int4_laneILi8ELi16ELi1EEEvPKjPK6__halfS5_S5_PS3_iii' for 'sm_89'
+ptxas info    : Function properties for _ZN7inferno14gemv_int4_laneILi8ELi16ELi1EEEvPKjPK6__halfS5_S5_PS3_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 88 registers, 404 bytes cmem[0], 8 bytes cmem[2]
+ptxas info    : Compiling entry function '_ZN7inferno14gemv_int4_laneILi7ELi16ELi1EEEvPKjPK6__halfS5_S5_PS3_iii' for 'sm_89'
+ptxas info    : Function properties for _ZN7inferno14gemv_int4_laneILi7ELi16ELi1EEEvPKjPK6__halfS5_S5_PS3_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 87 registers, 404 bytes cmem[0], 8 bytes cmem[2]
+ptxas info    : Compiling entry function '_ZN7inferno14gemv_int4_laneILi6ELi16ELi1EEEvPKjPK6__halfS5_S5_PS3_iii' for 'sm_89'
+ptxas info    : Function properties for _ZN7inferno14gemv_int4_laneILi6ELi16ELi1EEEvPKjPK6__halfS5_S5_PS3_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 86 registers, 404 bytes cmem[0], 8 bytes cmem[2]
+ptxas info    : Compiling entry function '_ZN7inferno14gemv_int4_laneILi5ELi16ELi1EEEvPKjPK6__halfS5_S5_PS3_iii' for 'sm_89'
+ptxas info    : Function properties for _ZN7inferno14gemv_int4_laneILi5ELi16ELi1EEEvPKjPK6__halfS5_S5_PS3_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 86 registers, 404 bytes cmem[0], 8 bytes cmem[2]
+ptxas info    : Compiling entry function '_ZN7inferno14gemv_int4_laneILi4ELi16ELi1EEEvPKjPK6__halfS5_S5_PS3_iii' for 'sm_89'
+ptxas info    : Function properties for _ZN7inferno14gemv_int4_laneILi4ELi16ELi1EEEvPKjPK6__halfS5_S5_PS3_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 76 registers, 404 bytes cmem[0], 8 bytes cmem[2]
+ptxas info    : Compiling entry function '_ZN7inferno14gemv_int4_laneILi3ELi16ELi1EEEvPKjPK6__halfS5_S5_PS3_iii' for 'sm_89'
+ptxas info    : Function properties for _ZN7inferno14gemv_int4_laneILi3ELi16ELi1EEEvPKjPK6__halfS5_S5_PS3_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 76 registers, 404 bytes cmem[0], 8 bytes cmem[2]
+ptxas info    : Compiling entry function '_ZN7inferno14gemv_int4_laneILi2ELi16ELi1EEEvPKjPK6__halfS5_S5_PS3_iii' for 'sm_89'
+ptxas info    : Function properties for _ZN7inferno14gemv_int4_laneILi2ELi16ELi1EEEvPKjPK6__halfS5_S5_PS3_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 64 registers, 404 bytes cmem[0]
+ptxas info    : Compiling entry function '_ZN7inferno15gemv_int4_batchILi16EEEvPKjPK6__halfS5_S5_PS3_iii' for 'sm_89'
+ptxas info    : Function properties for _ZN7inferno15gemv_int4_batchILi16EEEvPKjPK6__halfS5_S5_PS3_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 98 registers, 404 bytes cmem[0], 8 bytes cmem[2]
+ptxas info    : Compiling entry function '_ZN7inferno15gemv_int4_batchILi12EEEvPKjPK6__halfS5_S5_PS3_iii' for 'sm_89'
+ptxas info    : Function properties for _ZN7inferno15gemv_int4_batchILi12EEEvPKjPK6__halfS5_S5_PS3_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 87 registers, 404 bytes cmem[0], 8 bytes cmem[2]
+ptxas info    : Compiling entry function '_ZN7inferno15gemv_int4_batchILi8EEEvPKjPK6__halfS5_S5_PS3_iii' for 'sm_89'
+ptxas info    : Function properties for _ZN7inferno15gemv_int4_batchILi8EEEvPKjPK6__halfS5_S5_PS3_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 86 registers, 404 bytes cmem[0], 8 bytes cmem[2]
+ptxas info    : Compiling entry function '_ZN7inferno15gemv_int4_batchILi7EEEvPKjPK6__halfS5_S5_PS3_iii' for 'sm_89'
+ptxas info    : Function properties for _ZN7inferno15gemv_int4_batchILi7EEEvPKjPK6__halfS5_S5_PS3_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 88 registers, 404 bytes cmem[0], 8 bytes cmem[2]
+ptxas info    : Compiling entry function '_ZN7inferno15gemv_int4_batchILi6EEEvPKjPK6__halfS5_S5_PS3_iii' for 'sm_89'
+ptxas info    : Function properties for _ZN7inferno15gemv_int4_batchILi6EEEvPKjPK6__halfS5_S5_PS3_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 86 registers, 404 bytes cmem[0], 8 bytes cmem[2]
+ptxas info    : Compiling entry function '_ZN7inferno15gemv_int4_batchILi5EEEvPKjPK6__halfS5_S5_PS3_iii' for 'sm_89'
+ptxas info    : Function properties for _ZN7inferno15gemv_int4_batchILi5EEEvPKjPK6__halfS5_S5_PS3_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 80 registers, 404 bytes cmem[0], 8 bytes cmem[2]
+ptxas info    : Compiling entry function '_ZN7inferno15gemv_int4_batchILi4EEEvPKjPK6__halfS5_S5_PS3_iii' for 'sm_89'
+ptxas info    : Function properties for _ZN7inferno15gemv_int4_batchILi4EEEvPKjPK6__halfS5_S5_PS3_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 76 registers, 404 bytes cmem[0], 8 bytes cmem[2]
+ptxas info    : Compiling entry function '_ZN7inferno15gemv_int4_batchILi3EEEvPKjPK6__halfS5_S5_PS3_iii' for 'sm_89'
+ptxas info    : Function properties for _ZN7inferno15gemv_int4_batchILi3EEEvPKjPK6__halfS5_S5_PS3_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 76 registers, 404 bytes cmem[0], 8 bytes cmem[2]
+ptxas info    : Compiling entry function '_ZN7inferno15gemv_int4_batchILi2EEEvPKjPK6__halfS5_S5_PS3_iii' for 'sm_89'
+ptxas info    : Function properties for _ZN7inferno15gemv_int4_batchILi2EEEvPKjPK6__halfS5_S5_PS3_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 72 registers, 404 bytes cmem[0]
+ptxas info    : Compiling entry function '_ZN7inferno15gemv_int4_batchILi1EEEvPKjPK6__halfS5_S5_PS3_iii' for 'sm_89'
+ptxas info    : Function properties for _ZN7inferno15gemv_int4_batchILi1EEEvPKjPK6__halfS5_S5_PS3_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 38 registers, 404 bytes cmem[0]
+ptxas info    : Compiling entry function '_ZN7inferno14gemv_int4_laneILi1ELi8ELi6EEEvPKjPK6__halfS5_S5_PS3_iii' for 'sm_89'
+ptxas info    : Function properties for _ZN7inferno14gemv_int4_laneILi1ELi8ELi6EEEvPKjPK6__halfS5_S5_PS3_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 70 registers, 404 bytes cmem[0]
+ptxas info    : Compiling entry function '_ZN7inferno14gemv_int4_laneILi1ELi8ELi4EEEvPKjPK6__halfS5_S5_PS3_iii' for 'sm_89'
+ptxas info    : Function properties for _ZN7inferno14gemv_int4_laneILi1ELi8ELi4EEEvPKjPK6__halfS5_S5_PS3_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 56 registers, 404 bytes cmem[0]
+ptxas info    : Compiling entry function '_ZN7inferno14gemv_int4_laneILi1ELi8ELi2EEEvPKjPK6__halfS5_S5_PS3_iii' for 'sm_89'
+ptxas info    : Function properties for _ZN7inferno14gemv_int4_laneILi1ELi8ELi2EEEvPKjPK6__halfS5_S5_PS3_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, 404 bytes cmem[0]
+ptxas info    : Compiling entry function '_ZN7inferno14gemv_int4_laneILi1ELi8ELi1EEEvPKjPK6__halfS5_S5_PS3_iii' for 'sm_89'
+ptxas info    : Function properties for _ZN7inferno14gemv_int4_laneILi1ELi8ELi1EEEvPKjPK6__halfS5_S5_PS3_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, 404 bytes cmem[0]
+ptxas info    : Compiling entry function '_ZN7inferno14gemv_int4_laneILi1ELi16ELi4EEEvPKjPK6__halfS5_S5_PS3_iii' for 'sm_89'
+ptxas info    : Function properties for _ZN7inferno14gemv_int4_laneILi1ELi16ELi4EEEvPKjPK6__halfS5_S5_PS3_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 56 registers, 404 bytes cmem[0]
+ptxas info    : Compiling entry function '_ZN7inferno14gemv_int4_laneILi1ELi16ELi3EEEvPKjPK6__halfS5_S5_PS3_iii' for 'sm_89'
+ptxas info    : Function properties for _ZN7inferno14gemv_int4_laneILi1ELi16ELi3EEEvPKjPK6__halfS5_S5_PS3_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 48 registers, 404 bytes cmem[0]
+ptxas info    : Compiling entry function '_ZN7inferno14gemv_int4_laneILi1ELi16ELi2EEEvPKjPK6__halfS5_S5_PS3_iii' for 'sm_89'
+ptxas info    : Function properties for _ZN7inferno14gemv_int4_laneILi1ELi16ELi2EEEvPKjPK6__halfS5_S5_PS3_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, 404 bytes cmem[0]
+ptxas info    : Compiling entry function '_ZN7inferno14gemv_int4_laneILi1ELi16ELi1EEEvPKjPK6__halfS5_S5_PS3_iii' for 'sm_89'
+ptxas info    : Function properties for _ZN7inferno14gemv_int4_laneILi1ELi16ELi1EEEvPKjPK6__halfS5_S5_PS3_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, 404 bytes cmem[0]
+ptxas info    : Compiling entry function '_ZN7inferno14gemv_int4_laneILi1ELi32ELi4EEEvPKjPK6__halfS5_S5_PS3_iii' for 'sm_89'
+ptxas info    : Function properties for _ZN7inferno14gemv_int4_laneILi1ELi32ELi4EEEvPKjPK6__halfS5_S5_PS3_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 56 registers, 404 bytes cmem[0]
+ptxas info    : Compiling entry function '_ZN7inferno14gemv_int4_laneILi1ELi32ELi2EEEvPKjPK6__halfS5_S5_PS3_iii' for 'sm_89'
+ptxas info    : Function properties for _ZN7inferno14gemv_int4_laneILi1ELi32ELi2EEEvPKjPK6__halfS5_S5_PS3_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, 404 bytes cmem[0]
+ptxas info    : Compiling entry function '_ZN7inferno14gemv_int4_laneILi1ELi32ELi1EEEvPKjPK6__halfS5_S5_PS3_iii' for 'sm_89'
+ptxas info    : Function properties for _ZN7inferno14gemv_int4_laneILi1ELi32ELi1EEEvPKjPK6__halfS5_S5_PS3_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, 404 bytes cmem[0]
+ptxas info    : Compiling entry function '_ZN7inferno13gemv_int4_vecILb1EEEvPKjPK6__halfS5_S5_PS3_iii' for 'sm_89'
+ptxas info    : Function properties for _ZN7inferno13gemv_int4_vecILb1EEEvPKjPK6__halfS5_S5_PS3_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 32 registers, 404 bytes cmem[0]
+ptxas info    : Compiling entry function '_ZN7inferno13gemv_int4_vecILb0EEEvPKjPK6__halfS5_S5_PS3_iii' for 'sm_89'
+ptxas info    : Function properties for _ZN7inferno13gemv_int4_vecILb0EEEvPKjPK6__halfS5_S5_PS3_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 34 registers, 404 bytes cmem[0]
+ptxas info    : Compiling entry function '_ZN7inferno16gemv_int4_v4_algEPKjPK6__halfS4_S4_PS2_iii' for 'sm_89'
+ptxas info    : Function properties for _ZN7inferno16gemv_int4_v4_algEPKjPK6__halfS4_S4_PS2_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, 404 bytes cmem[0]
+ptxas info    : Compiling entry function '_ZN7inferno17gemv_int4_v1_warpEPKjPK6__halfS4_S4_PS2_iii' for 'sm_89'
+ptxas info    : Function properties for _ZN7inferno17gemv_int4_v1_warpEPKjPK6__halfS4_S4_PS2_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 34 registers, 404 bytes cmem[0]
+ptxas info    : Compiling entry function '_ZN7inferno18gemv_int4_v0_naiveEPKjPK6__halfS4_S4_PS2_iii' for 'sm_89'
+ptxas info    : Function properties for _ZN7inferno18gemv_int4_v0_naiveEPKjPK6__halfS4_S4_PS2_iii
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, 404 bytes cmem[0]

@@ -1,0 +1,84 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+ENV/
+env/
+.ipynb_checkpoints/
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# CUDA / compiled extensions / binaries
+*.so
+*.dylib
+*.dll
+*.o
+*.obj
+*.a
+*.lib
+
+# Environment, secrets & credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.pfx
+*.p12
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+
+# Results (keep the folder, not the raw data)
+results/*
+!results/.gitkeep
+
+# Model weights & caches
+*.pt
+*.pth
+*.bin
+*.safetensors
+*.onnx
+.cache/
+
+# OS & Editor artifacts
+.DS_Store
+Thumbs.db
+ehthumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Downloaded datasets / lockfile artifacts
+data/
+
+# Machine-specific calibrated workload rates (regenerate with `make calibrate`)
+configs/workload_config.local.yaml
+
+# Build artifacts and local server data
+src/inferno/kernels/bench_int4_gemv
+src/inferno/kernels/bench_int4_batch
+src/inferno/kernels/ptxas_report.txt
+src/inferno/kernels/ptxas_batch_report.txt
+src/inferno/kernels/libinferno_int4.so
+demo/.data.json
+requirements.lock
+build_report/

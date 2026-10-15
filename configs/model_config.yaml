@@ -1,0 +1,31 @@
+# Scoped for an 8 GB GPU (RTX 4060 Laptop). An 8B fp16 model needs ~16 GB and
+# cannot run here, so the study uses Qwen2.5-1.5B-Instruct, which has official
+# fp16 / GPTQ-Int8 / AWQ-Int4 releases from the same authors. Weights differ per
+# quantization level by construction; the base model and tokenizer are identical.
+# Re-run the key benchmarks on a larger model in the cloud phase (Phase 6).
+model:
+  base: "Qwen/Qwen2.5-1.5B-Instruct"
+  max_model_len: 2048
+
+checkpoints:
+  fp16: "Qwen/Qwen2.5-1.5B-Instruct"
+  int8: "Qwen/Qwen2.5-1.5B-Instruct-GPTQ-Int8"
+  int4: "Qwen/Qwen2.5-1.5B-Instruct-AWQ"
+
+# Value passed to vLLM's --quantization (null = unquantized)
+vllm_quantization:
+  fp16: null
+  int8: "gptq_marlin"     # vLLM fast path (plain "gptq"/"awq" select the older, slower kernels)
+  int4: "awq_marlin"
+
+quantization:
+  levels: ["fp16", "int8", "int4"]
+
+batch_sizes: [1, 8, 16, 32, 64]     # mapped to vLLM --max-num-seqs
+
+server:
+  backend: "vllm"
+  host: "127.0.0.1"
+  port: 8000
+  gpu_memory_utilization: 0.70      # headroom: Windows display stack holds ~1 GB; vLLM refuses to start if free < requested
+  startup_timeout_sec: 600
