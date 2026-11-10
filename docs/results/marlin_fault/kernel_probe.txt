@@ -1,0 +1,87 @@
+N=1536 K=8960 alloc=default gpu=NVIDIA GeForce RTX 4060 Laptop GPU SMs=24 workspace=(24,)
+B=   1 plain    bad= 0/40 worst_rel_err=3.09e-04
+B=   1 dirty    bad= 0/40 worst_rel_err=3.09e-04
+B=   1 fresh_ws bad= 0/40 worst_rel_err=3.09e-04
+B=   1 sync     bad= 0/40 worst_rel_err=3.09e-04
+B=   8 plain    bad= 0/40 worst_rel_err=2.46e-04
+B=   8 dirty    bad= 0/40 worst_rel_err=2.46e-04
+B=   8 fresh_ws bad= 0/40 worst_rel_err=2.46e-04
+B=   8 sync     bad= 0/40 worst_rel_err=2.46e-04
+B=  16 plain    bad= 0/40 worst_rel_err=3.22e-04
+B=  16 dirty    bad= 0/40 worst_rel_err=3.22e-04
+B=  16 fresh_ws bad= 0/40 worst_rel_err=3.22e-04
+B=  16 sync     bad= 0/40 worst_rel_err=3.22e-04
+B=  32 plain    bad=19/40 worst_rel_err=1.11e-01
+B=  32 dirty    bad=40/40 worst_rel_err=1.41e-01
+B=  32 fresh_ws bad=40/40 worst_rel_err=1.39e-01
+B=  32 sync     bad=31/40 worst_rel_err=1.31e-01
+B=  48 plain    bad= 0/40 worst_rel_err=2.27e-04
+B=  48 dirty    bad= 0/40 worst_rel_err=2.27e-04
+B=  48 fresh_ws bad= 0/40 worst_rel_err=2.27e-04
+B=  48 sync     bad= 0/40 worst_rel_err=2.27e-04
+B=  64 plain    bad= 6/40 worst_rel_err=1.23e-01
+B=  64 dirty    bad=13/40 worst_rel_err=1.23e-01
+B=  64 fresh_ws bad=40/40 worst_rel_err=1.56e-01
+B=  64 sync     bad=27/40 worst_rel_err=1.43e-01
+B= 128 plain    bad=12/40 worst_rel_err=1.03e-01
+B= 128 dirty    bad=29/40 worst_rel_err=1.56e-01
+B= 128 fresh_ws bad=40/40 worst_rel_err=1.46e-01
+B= 128 sync     bad=38/40 worst_rel_err=1.47e-01
+N=17920 K=1536 alloc=default gpu=NVIDIA GeForce RTX 4060 Laptop GPU SMs=24 workspace=(24,)
+B=   1 plain    bad= 0/40 worst_rel_err=2.73e-04
+B=   1 dirty    bad= 0/40 worst_rel_err=2.73e-04
+B=   1 fresh_ws bad= 0/40 worst_rel_err=2.73e-04
+B=   1 sync     bad= 0/40 worst_rel_err=2.73e-04
+B=   8 plain    bad= 0/40 worst_rel_err=2.66e-04
+B=   8 dirty    bad= 0/40 worst_rel_err=2.66e-04
+B=   8 fresh_ws bad= 0/40 worst_rel_err=2.66e-04
+B=   8 sync     bad= 0/40 worst_rel_err=2.66e-04
+B=  16 plain    bad= 0/40 worst_rel_err=2.51e-04
+B=  16 dirty    bad= 0/40 worst_rel_err=2.51e-04
+B=  16 fresh_ws bad= 0/40 worst_rel_err=2.51e-04
+B=  16 sync     bad= 0/40 worst_rel_err=2.51e-04
+B=  32 plain    bad=27/40 worst_rel_err=2.00e-01
+B=  32 dirty    bad=32/40 worst_rel_err=2.31e-01
+B=  32 fresh_ws bad=34/40 worst_rel_err=2.28e-01
+B=  32 sync     bad=11/40 worst_rel_err=1.83e-01
+B=  48 plain    bad= 0/40 worst_rel_err=3.91e-04
+B=  48 dirty    bad= 0/40 worst_rel_err=3.91e-04
+B=  48 fresh_ws bad= 0/40 worst_rel_err=3.91e-04
+B=  48 sync     bad= 0/40 worst_rel_err=3.91e-04
+B=  64 plain    bad=33/40 worst_rel_err=2.78e-01
+B=  64 dirty    bad=35/40 worst_rel_err=2.78e-01
+B=  64 fresh_ws bad=10/40 worst_rel_err=2.41e-01
+B=  64 sync     bad=30/40 worst_rel_err=2.41e-01
+B= 128 plain    bad=14/40 worst_rel_err=1.70e-01
+B= 128 dirty    bad=25/40 worst_rel_err=2.27e-01
+B= 128 fresh_ws bad=28/40 worst_rel_err=2.05e-01
+B= 128 sync     bad=16/40 worst_rel_err=1.58e-01
+N=2048 K=1536 alloc=default gpu=NVIDIA GeForce RTX 4060 Laptop GPU SMs=24 workspace=(24,)
+B=   1 plain    bad= 0/40 worst_rel_err=3.05e-04
+B=   1 dirty    bad= 0/40 worst_rel_err=3.05e-04
+B=   1 fresh_ws bad= 0/40 worst_rel_err=3.05e-04
+B=   1 sync     bad= 0/40 worst_rel_err=3.05e-04
+B=   8 plain    bad= 0/40 worst_rel_err=2.76e-04
+B=   8 dirty    bad= 0/40 worst_rel_err=2.76e-04
+B=   8 fresh_ws bad= 0/40 worst_rel_err=2.76e-04
+B=   8 sync     bad= 0/40 worst_rel_err=2.76e-04
+B=  16 plain    bad= 0/40 worst_rel_err=2.57e-04
+B=  16 dirty    bad= 0/40 worst_rel_err=2.57e-04
+B=  16 fresh_ws bad= 0/40 worst_rel_err=2.57e-04
+B=  16 sync     bad= 0/40 worst_rel_err=2.57e-04
+B=  32 plain    bad=21/40 worst_rel_err=1.86e-01
+B=  32 dirty    bad= 0/40 worst_rel_err=2.74e-04
+B=  32 fresh_ws bad=17/40 worst_rel_err=1.83e-01
+B=  32 sync     bad=31/40 worst_rel_err=1.96e-01
+B=  48 plain    bad= 0/40 worst_rel_err=2.52e-04
+B=  48 dirty    bad= 0/40 worst_rel_err=2.52e-04
+B=  48 fresh_ws bad= 0/40 worst_rel_err=2.52e-04
+B=  48 sync     bad= 0/40 worst_rel_err=2.52e-04
+B=  64 plain    bad=12/40 worst_rel_err=1.90e-01
+B=  64 dirty    bad= 3/40 worst_rel_err=1.67e-01
+B=  64 fresh_ws bad=20/40 worst_rel_err=1.85e-01
+B=  64 sync     bad=21/40 worst_rel_err=1.95e-01
+B= 128 plain    bad=20/40 worst_rel_err=2.37e-01
+B= 128 dirty    bad=31/40 worst_rel_err=2.37e-01
+B= 128 fresh_ws bad=16/40 worst_rel_err=1.74e-01
+B= 128 sync     bad=25/40 worst_rel_err=1.91e-01

@@ -1,0 +1,639 @@
+{
+  "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU",
+  "sms": 24,
+  "batches": [
+    1,
+    8,
+    16,
+    32,
+    48,
+    64,
+    128
+  ],
+  "faulty_batches": [
+    32,
+    64,
+    128
+  ],
+  "clean_batches": [
+    1,
+    8,
+    16,
+    48
+  ],
+  "worst_rel_err_faulty": 0.278,
+  "worst_rel_err_clean": 0.000391,
+  "shapes": [
+    {
+      "N": 1536,
+      "K": 8960,
+      "name": "down",
+      "rows": [
+        {
+          "B": 1,
+          "variant": "plain",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000309
+        },
+        {
+          "B": 1,
+          "variant": "dirty",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000309
+        },
+        {
+          "B": 1,
+          "variant": "fresh_ws",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000309
+        },
+        {
+          "B": 1,
+          "variant": "sync",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000309
+        },
+        {
+          "B": 8,
+          "variant": "plain",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000246
+        },
+        {
+          "B": 8,
+          "variant": "dirty",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000246
+        },
+        {
+          "B": 8,
+          "variant": "fresh_ws",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000246
+        },
+        {
+          "B": 8,
+          "variant": "sync",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000246
+        },
+        {
+          "B": 16,
+          "variant": "plain",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000322
+        },
+        {
+          "B": 16,
+          "variant": "dirty",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000322
+        },
+        {
+          "B": 16,
+          "variant": "fresh_ws",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000322
+        },
+        {
+          "B": 16,
+          "variant": "sync",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000322
+        },
+        {
+          "B": 32,
+          "variant": "plain",
+          "bad": 19,
+          "calls": 40,
+          "worst_rel_err": 0.111
+        },
+        {
+          "B": 32,
+          "variant": "dirty",
+          "bad": 40,
+          "calls": 40,
+          "worst_rel_err": 0.141
+        },
+        {
+          "B": 32,
+          "variant": "fresh_ws",
+          "bad": 40,
+          "calls": 40,
+          "worst_rel_err": 0.139
+        },
+        {
+          "B": 32,
+          "variant": "sync",
+          "bad": 31,
+          "calls": 40,
+          "worst_rel_err": 0.131
+        },
+        {
+          "B": 48,
+          "variant": "plain",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000227
+        },
+        {
+          "B": 48,
+          "variant": "dirty",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000227
+        },
+        {
+          "B": 48,
+          "variant": "fresh_ws",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000227
+        },
+        {
+          "B": 48,
+          "variant": "sync",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000227
+        },
+        {
+          "B": 64,
+          "variant": "plain",
+          "bad": 6,
+          "calls": 40,
+          "worst_rel_err": 0.123
+        },
+        {
+          "B": 64,
+          "variant": "dirty",
+          "bad": 13,
+          "calls": 40,
+          "worst_rel_err": 0.123
+        },
+        {
+          "B": 64,
+          "variant": "fresh_ws",
+          "bad": 40,
+          "calls": 40,
+          "worst_rel_err": 0.156
+        },
+        {
+          "B": 64,
+          "variant": "sync",
+          "bad": 27,
+          "calls": 40,
+          "worst_rel_err": 0.143
+        },
+        {
+          "B": 128,
+          "variant": "plain",
+          "bad": 12,
+          "calls": 40,
+          "worst_rel_err": 0.103
+        },
+        {
+          "B": 128,
+          "variant": "dirty",
+          "bad": 29,
+          "calls": 40,
+          "worst_rel_err": 0.156
+        },
+        {
+          "B": 128,
+          "variant": "fresh_ws",
+          "bad": 40,
+          "calls": 40,
+          "worst_rel_err": 0.146
+        },
+        {
+          "B": 128,
+          "variant": "sync",
+          "bad": 38,
+          "calls": 40,
+          "worst_rel_err": 0.147
+        }
+      ]
+    },
+    {
+      "N": 17920,
+      "K": 1536,
+      "name": "gate_up",
+      "rows": [
+        {
+          "B": 1,
+          "variant": "plain",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000273
+        },
+        {
+          "B": 1,
+          "variant": "dirty",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000273
+        },
+        {
+          "B": 1,
+          "variant": "fresh_ws",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000273
+        },
+        {
+          "B": 1,
+          "variant": "sync",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000273
+        },
+        {
+          "B": 8,
+          "variant": "plain",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000266
+        },
+        {
+          "B": 8,
+          "variant": "dirty",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000266
+        },
+        {
+          "B": 8,
+          "variant": "fresh_ws",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000266
+        },
+        {
+          "B": 8,
+          "variant": "sync",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000266
+        },
+        {
+          "B": 16,
+          "variant": "plain",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000251
+        },
+        {
+          "B": 16,
+          "variant": "dirty",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000251
+        },
+        {
+          "B": 16,
+          "variant": "fresh_ws",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000251
+        },
+        {
+          "B": 16,
+          "variant": "sync",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000251
+        },
+        {
+          "B": 32,
+          "variant": "plain",
+          "bad": 27,
+          "calls": 40,
+          "worst_rel_err": 0.2
+        },
+        {
+          "B": 32,
+          "variant": "dirty",
+          "bad": 32,
+          "calls": 40,
+          "worst_rel_err": 0.231
+        },
+        {
+          "B": 32,
+          "variant": "fresh_ws",
+          "bad": 34,
+          "calls": 40,
+          "worst_rel_err": 0.228
+        },
+        {
+          "B": 32,
+          "variant": "sync",
+          "bad": 11,
+          "calls": 40,
+          "worst_rel_err": 0.183
+        },
+        {
+          "B": 48,
+          "variant": "plain",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000391
+        },
+        {
+          "B": 48,
+          "variant": "dirty",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000391
+        },
+        {
+          "B": 48,
+          "variant": "fresh_ws",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000391
+        },
+        {
+          "B": 48,
+          "variant": "sync",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000391
+        },
+        {
+          "B": 64,
+          "variant": "plain",
+          "bad": 33,
+          "calls": 40,
+          "worst_rel_err": 0.278
+        },
+        {
+          "B": 64,
+          "variant": "dirty",
+          "bad": 35,
+          "calls": 40,
+          "worst_rel_err": 0.278
+        },
+        {
+          "B": 64,
+          "variant": "fresh_ws",
+          "bad": 10,
+          "calls": 40,
+          "worst_rel_err": 0.241
+        },
+        {
+          "B": 64,
+          "variant": "sync",
+          "bad": 30,
+          "calls": 40,
+          "worst_rel_err": 0.241
+        },
+        {
+          "B": 128,
+          "variant": "plain",
+          "bad": 14,
+          "calls": 40,
+          "worst_rel_err": 0.17
+        },
+        {
+          "B": 128,
+          "variant": "dirty",
+          "bad": 25,
+          "calls": 40,
+          "worst_rel_err": 0.227
+        },
+        {
+          "B": 128,
+          "variant": "fresh_ws",
+          "bad": 28,
+          "calls": 40,
+          "worst_rel_err": 0.205
+        },
+        {
+          "B": 128,
+          "variant": "sync",
+          "bad": 16,
+          "calls": 40,
+          "worst_rel_err": 0.158
+        }
+      ]
+    },
+    {
+      "N": 2048,
+      "K": 1536,
+      "name": "qkv",
+      "rows": [
+        {
+          "B": 1,
+          "variant": "plain",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000305
+        },
+        {
+          "B": 1,
+          "variant": "dirty",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000305
+        },
+        {
+          "B": 1,
+          "variant": "fresh_ws",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000305
+        },
+        {
+          "B": 1,
+          "variant": "sync",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000305
+        },
+        {
+          "B": 8,
+          "variant": "plain",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000276
+        },
+        {
+          "B": 8,
+          "variant": "dirty",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000276
+        },
+        {
+          "B": 8,
+          "variant": "fresh_ws",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000276
+        },
+        {
+          "B": 8,
+          "variant": "sync",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000276
+        },
+        {
+          "B": 16,
+          "variant": "plain",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000257
+        },
+        {
+          "B": 16,
+          "variant": "dirty",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000257
+        },
+        {
+          "B": 16,
+          "variant": "fresh_ws",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000257
+        },
+        {
+          "B": 16,
+          "variant": "sync",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000257
+        },
+        {
+          "B": 32,
+          "variant": "plain",
+          "bad": 21,
+          "calls": 40,
+          "worst_rel_err": 0.186
+        },
+        {
+          "B": 32,
+          "variant": "dirty",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000274
+        },
+        {
+          "B": 32,
+          "variant": "fresh_ws",
+          "bad": 17,
+          "calls": 40,
+          "worst_rel_err": 0.183
+        },
+        {
+          "B": 32,
+          "variant": "sync",
+          "bad": 31,
+          "calls": 40,
+          "worst_rel_err": 0.196
+        },
+        {
+          "B": 48,
+          "variant": "plain",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000252
+        },
+        {
+          "B": 48,
+          "variant": "dirty",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000252
+        },
+        {
+          "B": 48,
+          "variant": "fresh_ws",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000252
+        },
+        {
+          "B": 48,
+          "variant": "sync",
+          "bad": 0,
+          "calls": 40,
+          "worst_rel_err": 0.000252
+        },
+        {
+          "B": 64,
+          "variant": "plain",
+          "bad": 12,
+          "calls": 40,
+          "worst_rel_err": 0.19
+        },
+        {
+          "B": 64,
+          "variant": "dirty",
+          "bad": 3,
+          "calls": 40,
+          "worst_rel_err": 0.167
+        },
+        {
+          "B": 64,
+          "variant": "fresh_ws",
+          "bad": 20,
+          "calls": 40,
+          "worst_rel_err": 0.185
+        },
+        {
+          "B": 64,
+          "variant": "sync",
+          "bad": 21,
+          "calls": 40,
+          "worst_rel_err": 0.195
+        },
+        {
+          "B": 128,
+          "variant": "plain",
+          "bad": 20,
+          "calls": 40,
+          "worst_rel_err": 0.237
+        },
+        {
+          "B": 128,
+          "variant": "dirty",
+          "bad": 31,
+          "calls": 40,
+          "worst_rel_err": 0.237
+        },
+        {
+          "B": 128,
+          "variant": "fresh_ws",
+          "bad": 16,
+          "calls": 40,
+          "worst_rel_err": 0.174
+        },
+        {
+          "B": 128,
+          "variant": "sync",
+          "bad": 25,
+          "calls": 40,
+          "worst_rel_err": 0.191
+        }
+      ]
+    }
+  ],
+  "e2e": {},
+  "status": "observed on one machine (WSL2, laptop GPU); not yet reproduced on other hardware"
+}

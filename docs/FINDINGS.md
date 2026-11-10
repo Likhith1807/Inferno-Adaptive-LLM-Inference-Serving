@@ -82,6 +82,22 @@ Steady load at 0.6x the measured capacity of the best configuration; 3 repetitio
 - A batch cap of 1 cannot sustain this load at any quantization level (fp16 and int8 complete 0% of requests in the window); caps of 32 and 64 are indistinguishable at this load because in-flight concurrency stays under 32.
 - **Reconfiguration is expensive:** restarting the server to change batch size or quantization took a median of **48 s** (model already cached), several times a 10 s burst. This is why the controller routes across pre-loaded replicas instead of hot-swapping.
 
+## 5. Where the custom kernel earns its place: almost nowhere (decision: keep vLLM's Marlin)
+
+Every Qwen2.5-1.5B decode layer at batch 1-64, same AWQ weights for every implementation, weights streamed from DRAM, CUDA-graph timing (`docs/results/layer_matrix/report.md`, `scripts/run_layer_matrix.sh`).
+
+- Custom/Marlin time at batch 1: qkv 0.92, o_proj 0.88, gate_up 1.01, down 1.08. The custom kernel clearly wins only on qkv, o_proj, which are 15% of quantized-GEMM time per decode step; the two large layers (gate_up 58%, down 28%) are ties.
+- From batch 4 the custom kernel is 2-7x slower: its cost grows linearly with batch (it re-reads activations per row on CUDA cores), while Marlin's tensor-core tiles stay flat to batch 16.
+- One-time layout conversion is negligible for both (milliseconds per layer at load).
+- **Decision (pre-stated rule):** the built-in path already matches the custom kernel on the layers that dominate decode, so the kernel is not carried into the serving path as a default; engineering effort goes to routing. The opt-in integration (`inferno.kernels.vllm_int4.install`) stays as a research tool.
+
+## 6. vLLM's Marlin int4 GEMM returned wrong results at some batch sizes on this machine
+
+The layer benchmark's correctness check flagged Marlin. In isolation (40 identical calls per cell, `docs/results/marlin_fault/report.md`), batches [32, 64, 128] give intermittent relative errors up to 0.28 on every Qwen shape tested, while batches [1, 8, 16, 48] are always correct (worst 4e-04). The custom kernel, classic AWQ and fp16 are correct on the same inputs; a fresh zeroed workspace does not remove it.
+- **Status: observed on one machine (WSL2, laptop GPU); not yet reproduced on other hardware.** It may be specific to WSL2 or this GPU; it is not called a vLLM bug until it reproduces elsewhere (`scripts/probe_marlin_flaky.sh`).
+- Real-checkpoint end-to-end check (`scripts/probe_marlin_e2e.sh`) not run yet.
+- Marlin timings at those batch sizes in section 5 should be read with this caveat.
+
 ## Limitations
 
-Single small GPU; replicas share it. Synthetic prompt text with server-verified token counts; checkpoint quality is not evaluated. Kernel result is batch 1 only. n=4-8 repetitions per cell: enough for large effects, not for effects near 1%. See `docs/methodology.md`.
+Single small GPU; replicas share it. Synthetic prompt text with server-verified token counts; checkpoint quality is not evaluated. n=4-8 repetitions per cell: enough for large effects, not for effects near 1%. See `docs/methodology.md`.

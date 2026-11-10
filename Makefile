@@ -1,4 +1,4 @@
-.PHONY: pdf kernel-all setup toolchain test plan calibrate contention site smoke trace kernel kernel-profile kernel-compare mpi-bench baseline sweep scaling adaptive campaign report readme freeze clean
+.PHONY: figure quick-bench layer-matrix marlin-probe findings pdf kernel-all setup toolchain test plan calibrate contention site smoke trace kernel kernel-profile kernel-compare mpi-bench baseline sweep scaling adaptive campaign report readme freeze clean
 CONFIG ?= configs/experiment_config.yaml
 
 setup:
@@ -94,3 +94,26 @@ clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	rm -rf build/ dist/ *.egg-info
 	$(MAKE) -C src/inferno/kernels clean
+
+# Milestone 5: headline figure from saved data only (no GPU needed)
+figure:
+	python scripts/make_headline_figure.py
+
+# Short GPU benchmark for independent reproduction (~3-5 min); writes results/quick/<timestamp>/
+quick-bench:
+	bash scripts/quick_bench.sh
+
+# Every Qwen2.5-1.5B decode layer x batch 1..64: custom vs Marlin vs AWQ vs fp16 (docs/results/layer_matrix/report.md)
+layer-matrix:
+	bash scripts/run_layer_matrix.sh
+
+# Marlin batch-size correctness probe (kernel level + real checkpoint) -> docs/results/marlin_fault/report.md
+marlin-probe:
+	mkdir -p results/marlin_fault
+	bash scripts/probe_marlin_flaky.sh > results/marlin_fault/kernel_probe.txt
+	bash scripts/probe_marlin_e2e.sh
+	python scripts/summarize_marlin_fault.py
+
+# Regenerate FINDINGS.md, POST_DRAFT.md and the README findings block from docs/results
+findings:
+	python scripts/build_findings.py

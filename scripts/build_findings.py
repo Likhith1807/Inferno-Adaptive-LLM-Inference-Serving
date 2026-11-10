@@ -19,6 +19,14 @@ def load(rel):
     return json.loads(p.read_text()) if p.exists() else None
 
 
+def _p99(cont, pattern, config):
+    return next(c["e2e_p99"] for c in cont["cells"] if c["pattern"] == pattern and c["config"] == config)
+
+
+def _n(cont, pattern):
+    return min(c["n"] for c in cont["cells"] if c["pattern"] == pattern)
+
+
 def main():
     kern = load("kernel_bench.json")
     cmp_md = (R / "kernel_comparison.md")
@@ -207,9 +215,58 @@ def main():
                      "took a median of **%.0f s** (model already cached), several times a 10 s burst. This is why the "
                      "controller routes across pre-loaded replicas instead of hot-swapping.\n" % facts["sweep"][3])
 
+    # ---------------------------------------------------------------- layer matrix (milestone 2)
+    lm = load("layer_matrix/layer_matrix.json")
+    if lm:
+        B = lm["batches"]
+        ratio = {n: {b: (s["cells"][f"custom/B{b}"]["us_median"] / s["cells"][f"marlin/B{b}"]["us_median"])
+                     for b in B if s["cells"].get(f"custom/B{b}")} for n, s in lm["shapes"].items()}
+        share = {n: s["cells"]["marlin/B1"]["us_median"] for n, s in lm["shapes"].items()}
+        tot = sum(share.values())
+        share = {n: 100 * v / tot for n, v in share.items()}
+        b1_wins = [n for n in ratio if ratio[n][1] < 1 and lm["shapes"][n]["cells"]["custom/B1"]["us_max"]
+                   < lm["shapes"][n]["cells"]["marlin/B1"]["us_min"]]
+        wins_share = sum(share[n] for n in b1_wins)
+        hi = max(r[16] for r in ratio.values() if 16 in r)
+        facts["lm"] = (ratio, share, b1_wins, wins_share, hi)
+        F.append("## 5. Where the custom kernel earns its place: almost nowhere (decision: keep vLLM's Marlin)\n")
+        F.append("Every Qwen2.5-1.5B decode layer at batch 1-64, same AWQ weights for every implementation, weights "
+                 "streamed from DRAM, CUDA-graph timing (`docs/results/layer_matrix/report.md`, "
+                 "`scripts/run_layer_matrix.sh`).\n")
+        F.append("- Custom/Marlin time at batch 1: " + ", ".join(f"{n} {ratio[n][1]:.2f}" for n in ratio)
+                 + f". The custom kernel clearly wins only on {', '.join(b1_wins) or 'no layer'}, "
+                 f"which are {wins_share:.0f}% of quantized-GEMM time per decode step; the two large layers "
+                 f"(gate_up {share['gate_up']:.0f}%, down {share['down']:.0f}%) are ties.")
+        F.append(f"- From batch 4 the custom kernel is 2-{hi:.0f}x slower: its time grows roughly linearly with batch "
+                 "(CUDA-core arithmetic per weight scales with batch), while Marlin's tensor-core path stays flat to batch 16.")
+        F.append("- One-time layout conversion is negligible for both (milliseconds per layer at load).")
+        F.append("- **Decision (pre-stated rule):** the built-in path already matches the custom kernel on the layers "
+                 "that dominate decode, so the kernel is not carried into the serving path as a default; engineering "
+                 "effort goes to routing. The opt-in integration (`inferno.kernels.vllm_int4.install`) stays as a "
+                 "research tool.\n")
+
+    mf = load("marlin_fault/summary.json")
+    if mf:
+        facts["mf"] = mf
+        F.append("## 6. vLLM's Marlin int4 GEMM returned wrong results at some batch sizes on this machine\n")
+        F.append(f"The layer benchmark's correctness check flagged Marlin. In isolation (40 identical calls per cell, "
+                 f"`docs/results/marlin_fault/report.md`), batches {mf['faulty_batches']} give intermittent relative "
+                 f"errors up to {mf['worst_rel_err_faulty']:.2f} on every Qwen shape tested, while batches "
+                 f"{mf['clean_batches']} are always correct (worst {mf['worst_rel_err_clean']:.0e}). The custom kernel, "
+                 "classic AWQ and fp16 are correct on the same inputs; a fresh zeroed workspace does not remove it.")
+        F.append(f"- **Status: {mf['status']}.** It may be specific to WSL2 or this GPU; it is not called a vLLM bug "
+                 "until it reproduces elsewhere (`scripts/probe_marlin_flaky.sh`).")
+        if mf.get("e2e"):
+            F.append("- Real-checkpoint greedy decode, batched copies identical to the batch-1 text: " + "; ".join(
+                f"{k}: " + ", ".join(f"B={b} {c['exact_match']}/{c['n']}" for b, c in v["batches"].items())
+                for k, v in mf["e2e"].items()) + ".")
+        else:
+            F.append("- Real-checkpoint end-to-end check (`scripts/probe_marlin_e2e.sh`) not run yet.")
+        F.append("- Marlin timings at those batch sizes in section 5 should be read with this caveat.\n")
+
     F.append("## Limitations\n")
     F.append("Single small GPU; replicas share it. Synthetic prompt text with server-verified token counts; "
-             "checkpoint quality is not evaluated. Kernel result is batch 1 only. n=4-8 repetitions per cell: enough "
+             "checkpoint quality is not evaluated. n=4-8 repetitions per cell: enough "
              "for large effects, not for effects near 1%. See `docs/methodology.md`.\n")
     (ROOT / "docs" / "FINDINGS.md").write_text("\n".join(F), encoding="utf-8")
 
@@ -233,8 +290,22 @@ def main():
                  "configuration, 8 paired repetitions, Holm-corrected.")
     if "cont" in facts:
         S.append("- **Why:** a second *active* replica on the same GPU multiplies p99 by "
-                 + "%.1fx" % facts["cont"][0][0]["ratio_a_over_b"] + "; an idle resident one costs nothing. "
-                 "Replicas need separate devices.")
+                 + "%.1fx" % facts["cont"][0][0]["ratio_a_over_b"] + "; an idle resident one costs nothing"
+                 + (" (60%% load: %.2f s one server, %.2f s with an idle second replica, %.2f s with both serving; "
+                    "%d paired reps)" % (tuple(_p99(cont, "rho0.6", c) for c in ("single", "split-idle", "split-active"))
+                                         + (_n(cont, "rho0.6"),)) if cont else "")
+                 + ". Replicas need separate devices.")
+    if "lm" in facts:
+        ratio, share, b1_wins, wins_share, hi = facts["lm"]
+        S.append(f"- **Kernel vs vLLM's Marlin, every Qwen layer, batch 1-64:** the custom kernel wins only on "
+                 f"{'/'.join(b1_wins) or 'no layer'} at batch 1 ({wins_share:.0f}% of decode GEMM time), ties the large "
+                 f"layers, and is 2-{hi:.0f}x slower from batch 4. Decision: keep Marlin; effort moves to routing.")
+    if "mf" in facts:
+        mf = facts["mf"]
+        S.append(f"- **Correctness finding (unconfirmed elsewhere):** on this machine vLLM 0.11's Marlin int4 GEMM gave "
+                 f"intermittent errors up to {mf['worst_rel_err_faulty']:.0%} at batches {mf['faulty_batches']}, correct at "
+                 f"{mf['clean_batches']}; caught by the benchmark's reference check "
+                 "([report](docs/results/marlin_fault/report.md)).")
     if "sweep" in facts:
         f16, i8, i4, cold = facts["sweep"]
         S.append("- **Quantization (same offered load):** int4 vs fp16 cuts p50 latency %.1fx and lifts tokens/joule %+.0f%%; "
@@ -267,9 +338,10 @@ def main():
         n, (b, sp) = facts["kern_top"]
         O.append("| H3 | A hand-written fused int4 kernel reaches a fraction of the vendor path; the gap is explained by "
                  "profiler counters | **Refuted as stated, explanation pending:** the kernel reaches %.0f%% of DRAM peak and %.2fx fp16 cuBLAS on %s; "
-                 "in situ it is close to, but not faster than, vLLM's Marlin kernel at batch 1, and slower at concurrency. "
-                 "Counter-level explanation is pending (GPU counters blocked, `docs/PROFILING.md`). |"
-                 % (b["pct_peak"], sp, n))
+                 "in situ it is close to, but not faster than, vLLM's Marlin kernel at batch 1, and slower at concurrency"
+                 % (b["pct_peak"], sp, n)
+                 + (" (layer matrix: wins only %s at batch 1)" % ("/".join(facts["lm"][2]) or "no layer") if "lm" in facts else "")
+                 + ". Counter-level explanation is pending (GPU counters blocked, `docs/PROFILING.md`). |")
     eff_csv = R / "campaign" / "all_metrics_ci.csv"
     if eff_csv.exists() and "h1" in facts:
         ci = pd.read_csv(eff_csv)
@@ -321,14 +393,24 @@ def main():
     P.append("## Resume bullets\n")
     if "kern_top" in facts:
         n, (b, sp) = facts["kern_top"]
-        P.append(f"- Wrote a fused int4-dequantize GEMV CUDA kernel reaching {b['pct_peak']:.0f}% of DRAM bandwidth "
-                 f"({sp:.2f}x over fp16 cuBLAS) on RTX 4060; validated against a CPU reference, benchmarked with "
-                 "L2-defeating rotation (and a correction when 6x-L2 turned out to leak), run-to-run spread; integrated into vLLM as a torch custom op "
-                 "and compared end to end against Marlin and AWQ kernels (parity at batch 1).")
-    if "h1" in facts:
-        P.append("- Built an open-loop LLM serving benchmark (TTFT/TPOT/p99, goodput, tokens/J) with paired seeded "
-                 "workloads and Holm-corrected tests; pre-registered and rejected an adaptive-routing hypothesis, then "
-                 "isolated the cause (GPU co-residency contention) with a controlled experiment.")
+        shp = kern["shapes"][[s["name"].split("(")[0].strip() for s in kern["shapes"]].index(n)]
+        P.append(f"- Implemented a fused INT4 dequantization + matrix-vector CUDA kernel, verified against a "
+                 f"double-precision CPU reference; measured {sp:.2f}x over FP16 cuBLAS on a {shp['N']} x {shp['K']} layer "
+                 f"at batch 1 ({b['pct_peak']:.0f}% of peak DRAM bandwidth; byte-ratio ceiling {facts['ceil_top']:.2f}x).")
+    if "lm" in facts:
+        ratio, share, b1_wins, wins_share, hi = facts["lm"]
+        P.append(f"- Benchmarked the kernel against vLLM's Marlin and AWQ paths on every Qwen2.5 decode layer at batch "
+                 f"1-64; it won only layers worth {wins_share:.0f}% of decode GEMM time and lost up to {hi:.0f}x at batch 16, "
+                 "so I kept the library path and redirected effort; the harness's reference check also flagged "
+                 "batch-dependent wrong results from Marlin on this machine.")
+    if "h1" in facts and cont:
+        camp_n = len(__import__("pandas").read_csv(R / "campaign" / "summary.csv")) if (R / "campaign" / "summary.csv").exists() else None
+        P.append(f"- Built an LLM inference benchmark spanning CUDA, vLLM and MPI on an 8 GB RTX 4060"
+                 + (f"; ran a {camp_n}-run paired campaign that rejected an adaptive-routing hypothesis" if camp_n else "")
+                 + ". A controlled %d-rep study isolated the cause: at 60%% load, activating a second GPU-sharing "
+                 "replica raised p99 from %.2f s to %.2f s, while loading it idle gave %.2f s."
+                 % (_n(cont, "rho0.6"), _p99(cont, "rho0.6", "single"), _p99(cont, "rho0.6", "split-active"),
+                    _p99(cont, "rho0.6", "split-idle")))
     if "mpi" in facts:
         P.append("- Designed an MPI request router with per-hop timestamps and a GPU-free microbenchmark; found it "
                  "indistinguishable from an HTTP router end to end and traced a 1000x gap between isolated and in-situ hop "

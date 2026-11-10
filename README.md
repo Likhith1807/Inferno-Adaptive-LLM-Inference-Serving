@@ -17,7 +17,9 @@ Open [`docs/demo/index.html`](docs/demo/index.html) in a browser (or host it on 
 
 - **Kernel:** a hand-written fused int4 GEMV reaches 95% of theoretical DRAM bandwidth (97% of the measured streaming-read bandwidth) and 3.67x fp16 cuBLAS on `llama7B_mlp_up` (byte-ratio ceiling 3.76x). Inside vLLM (CUDA graphs, one sequence) it decodes at 144 tok/s vs 143 for the default Marlin path (67 for fp16), and Marlin is faster with 4+ concurrent sequences. It does not beat vLLM's Marlin kernel at batch 1 (an earlier claim that it did was a measurement error, since corrected).
 - **Adaptive routing (H1) was rejected:** p99 +112% to +204% versus the best fixed configuration, 8 paired repetitions, Holm-corrected.
-- **Why:** a second *active* replica on the same GPU multiplies p99 by 2.1x; an idle resident one costs nothing. Replicas need separate devices.
+- **Why:** a second *active* replica on the same GPU multiplies p99 by 2.1x; an idle resident one costs nothing (60% load: 6.21 s one server, 6.26 s with an idle second replica, 13.02 s with both serving; 5 paired reps). Replicas need separate devices.
+- **Kernel vs vLLM's Marlin, every Qwen layer, batch 1-64:** the custom kernel wins only on qkv/o_proj at batch 1 (15% of decode GEMM time), ties the large layers, and is 2-7x slower from batch 4. Decision: keep Marlin; effort moves to routing.
+- **Correctness finding (unconfirmed elsewhere):** on this machine vLLM 0.11's Marlin int4 GEMM gave intermittent errors up to 28% at batches [32, 64, 128], correct at [1, 8, 16, 48]; caught by the benchmark's reference check ([report](docs/results/marlin_fault/report.md)).
 - **Quantization (same offered load):** int4 vs fp16 cuts p50 latency 2.1x and lifts tokens/joule +12%; reconfiguring a server costs ~48 s, so adaptivity has to route across pre-loaded replicas.
 - **MPI routing:** ~2 us per hop in isolation, no measurable end-to-end difference from an HTTP router.
 <!-- FINDINGS:END -->
@@ -59,7 +61,7 @@ Measured on `campaign` (mean ± 95% CI, paired by repetition). Raw data and code
 |---|---|---|
 | H1 | The adaptive router achieves lower p99 than the best fixed configuration at non-inferior throughput under bursty / mixed-length load | **Rejected** on this hardware: p99 bursty +112%, mixed_length +204%, steady +195% (paired, Holm-corrected). Mechanism isolated; untested with one replica per GPU. |
 | H2 | MPI-coordinated multi-replica routing scales sub-linearly; coordination overhead is measured | **Sub-linear: yes** (2 replicas on one GPU: efficiency 0.47, throughput 2106 to 1980 tok/s). **Overhead:** ~2 us/hop isolated, ~2.0 ms in situ, MPI vs HTTP throughput +0.58%, +0.01%; no crossover observed. |
-| H3 | A hand-written fused int4 kernel reaches a fraction of the vendor path; the gap is explained by profiler counters | **Refuted as stated, explanation pending:** the kernel reaches 95% of DRAM peak and 3.67x fp16 cuBLAS on llama7B_mlp_up; in situ it is close to, but not faster than, vLLM's Marlin kernel at batch 1, and slower at concurrency. Counter-level explanation is pending (GPU counters blocked, `docs/PROFILING.md`). |
+| H3 | A hand-written fused int4 kernel reaches a fraction of the vendor path; the gap is explained by profiler counters | **Refuted as stated, explanation pending:** the kernel reaches 95% of DRAM peak and 3.67x fp16 cuBLAS on llama7B_mlp_up; in situ it is close to, but not faster than, vLLM's Marlin kernel at batch 1, and slower at concurrency (layer matrix: wins only qkv/o_proj at batch 1). Counter-level explanation is pending (GPU counters blocked, `docs/PROFILING.md`). |
 | H4 | Systems-level adaptivity, not model changes, drives efficiency gains (tokens per joule) | **Not supported locally:** adaptive tokens/joule vs the best fixed config: bursty -10.0%, mixed_length -6.3%, steady -7.9%. |
 <!-- OUTCOMES:END -->
 
@@ -81,6 +83,17 @@ negative outcomes as plainly as wins.
   DRAM; without this, cache hits inflate bandwidth (6x L2 was tried first and leaked ~6%, which was found and corrected).
   Library kernels are timed in situ in CUDA-graph decode and end to end, not only in isolation.
 
+## Verify it in two commands
+
+```bash
+make figure        # rebuilds the headline figure from saved data (docs/results), no GPU needed
+make quick-bench   # ~3-5 min GPU run: hardware record + kernel/Marlin/AWQ timings + Marlin correctness probe
+```
+
+![headline](docs/figures/headline_light.png)
+
+Reproducing on your own machine? Follow [`docs/REPRODUCE.md`](docs/REPRODUCE.md) and send back the files it lists.
+
 ## Quick start
 
 Linux or WSL2 (vLLM does not run on native Windows).
@@ -94,6 +107,8 @@ make test                          # unit tests (no GPU needed)
 make plan                          # what each experiment would run, and how long it takes
 make smoke                         # ~10 min end-to-end check on one config
 make kernel                        # build + run the CUDA kernel benchmark
+make layer-matrix                  # every Qwen layer x batch 1..64: custom vs Marlin vs AWQ vs fp16
+make marlin-probe                  # Marlin batch-size correctness probe
 make calibrate                     # measure capacity, derive load rates from it
 make baseline | sweep | scaling | contention | campaign
 make report RUN=results/<run>      # tables + figures from a finished run
