@@ -53,6 +53,12 @@ def stat(s, x, y, w, h, big, small, color=CRIMSON, fill=PALE, big_size=30, small
              fill=fill, line=None, anchor="m", margin=0.18, space_after=0)
 
 
+def dark_slide(sl, colors):
+    """Full-bleed gradient panel over the template chassis, leaving the crimson footer visible."""
+    from pptx.enum.shapes import MSO_SHAPE
+    box(sl, 0, 0, 13.334, 7.06, fill=None, line=None, gradient=colors, shape=MSO_SHAPE.RECTANGLE)
+
+
 def build(team):
     F = facts()
     k, e = F["kern"], F["e2e"]
@@ -103,6 +109,34 @@ controller, and measured everything with paired statistics on one laptop GPU. Ev
 """)
     notes(s_contents, "Agenda: problem, literature, objectives, methodology, tools and setup, then our results (seven result slides), challenges, conclusions and "
                       "future scope, team, references.")
+
+    # ================================================================== 1b. hero: the project in 30 seconds
+    s = new("")
+    order.remove(s)
+    order.insert(1, s)
+    dark_slide(s, (RGBColorHex("0A1633"), RGBColorHex("1B2F6B")))
+    text(s, 0.8, 0.55, 11.7, 0.4, "INFERNO  ·  HPC FINAL EVALUATION 2026", size=15, bold=True, color=RGBColorHex("FFB4C2"))
+    text(s, 0.8, 1.0, 11.8, 1.6, "We built an LLM serving stack from the CUDA kernel up, and measured every claim.", size=38, bold=True,
+         color=WHITE, font="Times New Roman")
+    act = p99[("rho0.6", "split-active")]["e2e_p99"] / p99[("rho0.6", "single")]["e2e_p99"]
+    hero_stats = [(f"{k['speedup']:.2f}×", "fused int4 kernel vs FP16 cuBLAS", "FFD27A"),
+                  (f"{k['pct']:.0f}%", "of the GPU's memory bandwidth", "9EC5FF"),
+                  (f"{act:.1f}×", "p99 when two replicas share one GPU", "7EE0B5"),
+                  (f"{mf['worst_rel_err_faulty']:.0%}", "error our check caught in vLLM's Marlin kernel", "FFB4C2")]
+    for i, (big, small, col) in enumerate(hero_stats):
+        x = 0.8 + i * 3.0
+        box(s, x, 3.05, 2.75, 2.35, fill=RGBColorHex("13275A"), line=RGBColorHex("2E4A8F"), radius=0.08)
+        text(s, x + 0.15, 3.2, 2.45, 1.15, big, size=50, bold=True, color=RGBColorHex(col), align="c", anchor="m")
+        text(s, x + 0.2, 4.4, 2.35, 0.9, small, size=15, color=RGBColorHex("DCE6F7"), align="c")
+    text(s, 0.8, 5.75, 11.8, 0.45, "1 laptop GPU  ·  4 implementations × 7 batch sizes  ·  96 paired serving runs  ·  81 tests  ·  every number from raw data",
+         size=15, color=RGBColorHex("B9C7E4"), align="c")
+    text(s, 0.8, 6.25, 11.8, 0.5, "CUDA  →  vLLM  →  MPI  →  statistics", size=20, bold=True, color=WHITE, align="c")
+    notes(s, f"""
+Inferno in thirty seconds. We built a large-language-model serving stack from the bottom up: our own CUDA kernel, integrated into the vLLM engine, behind an MPI router,
+and measured with paired statistics. Four numbers to remember: our kernel is {k['speedup']:.2f} times faster than FP16 cuBLAS at {k['pct']:.0f} percent of the GPU's memory
+bandwidth; two model replicas actively sharing one GPU raise tail latency {act:.1f} times; and our correctness check caught vLLM's production int4 kernel returning answers
+up to {mf['worst_rel_err_faulty']:.0%} wrong at some batch sizes on our machine. The rest of the talk shows how we got each number.
+""")
 
     # ================================================================== 3. problem
     s = new("Problem Statement", "1 · PROBLEM")
@@ -234,6 +268,27 @@ server is slow, a router (fixed, adaptive or MPI), vLLM replicas sharing one GPU
 automatically generated report. The key idea: identical seeded traffic goes through every policy, so any difference is caused by the policy.
 """)
 
+    # ================================================================== 6b. system architecture
+    s = new("System Architecture", "4 · METHOD")
+    picture(s, ROOT / "build_report" / "figs" / "architecture.png", X0 + 0.1, 1.3, h=4.75)
+    xr = X0 + 0.1 + 4.75 * 1817 / 1043 + 0.35
+    wr = X1 - xr
+    steps4 = [("Generate", "seeded bursty traffic, open-loop client", NAVY), ("Route", "HTTP · MPI rank 0 + workers · adaptive policy", GREEN),
+              ("Serve", "two vLLM replicas on ONE 8 GB GPU", CRIMSON), ("Measure", "per-request logs, power, paired statistics", AMBER)]
+    for i, (t, d, col) in enumerate(steps4):
+        y = 1.3 + i * 1.2
+        card(s, xr, y, wr, 1.05, fill=WHITE)
+        badge(s, xr + 0.15, y + 0.27, 0.5, str(i + 1), col, size=16)
+        text(s, xr + 0.8, y + 0.05, wr - 0.9, 0.42, t, size=17, bold=True, color=NAVY)
+        text(s, xr + 0.8, y + 0.45, wr - 0.9, 0.58, d, size=13, color=INK)
+    banner(s, 6.25, 0.62, "One codebase:  ", "the same harness drives the kernel study, the serving campaign and the MPI experiments.", size=15)
+    notes(s, """
+The full system on one page. A workload generator and an open-loop client produce the traffic; a routing layer, either a plain HTTP baseline, our MPI dispatcher with
+workers, or our adaptive policy router, sends each request to one of two vLLM replicas, a fast tier and a bulk tier, sharing one 8 GB GPU. Every request is logged with
+its timings and GPU power, and the analysis step produces the statistics and generates the report. Capacity calibration sets the load to known fractions of what the
+GPU can serve. The standalone CUDA kernel benchmark is the bottom-centre box.
+""")
+
     # ================================================================== 7. methodology: parallelization
     s = new("Proposed Methodology: Parallelization", "4 · METHOD 2/2")
     lv = [("LEVEL 1", "CUDA", "inside one layer", CRIMSON, "each output row of the matrix · each row = K/32 chunks of 32 weights",
@@ -297,6 +352,59 @@ tensor math, which is CUDA's job.
 Tools on the left, setup on the right. One laptop GPU, CUDA 12.4, vLLM 0.11, Open MPI, and Qwen2.5-1.5B in three precisions. Five experiments: the kernel ladder on six
 real layer shapes, the new layer matrix (four Qwen layers, seven batch sizes, four implementations), a 96-run serving campaign, load calibrated from measured capacity,
 and a controlled mechanism study. All workloads are seeded, so any run can be repeated exactly.
+""")
+
+    # ================================================================== 8b. why trust these numbers
+    s = new("Why You Can Trust These Numbers", "5 · RIGOUR")
+    pillars = [("Correctness gate", "Every kernel is checked against a CPU / FP32 reference BEFORE it is timed. This is how we caught Marlin's wrong outputs.", GREEN),
+               ("DRAM-honest timing", "Weights rotated over 768 MB (24× L2) plus CUDA graphs, so no cache and no launch overhead flatter a result.", NAVY),
+               ("Paired, seeded statistics", "The same traffic is replayed through every policy; paired tests, Holm correction, 95% intervals, 8 repetitions.", CRIMSON),
+               ("We corrected ourselves", "Two of our own claims were retracted after cross-checks: a 6% cache leak and a mis-measured Marlin baseline.", AMBER)]
+    pw4 = (W - 3 * 0.18) / 4
+    for i, (t, d, col) in enumerate(pillars):
+        x = X0 + i * (pw4 + 0.18)
+        card(s, x, 1.35, pw4, 3.9, fill=WHITE, line=LINE)
+        box(s, x, 1.35, pw4, 0.95, fill=col, line=None, radius=0.08)
+        text(s, x + 0.15, 1.35, pw4 - 0.3, 0.95, t, size=19, bold=True, color=WHITE, align="c", anchor="m")
+        text(s, x + 0.25, 2.5, pw4 - 0.5, 2.7, d, size=18.5, color=INK)
+    tiles2 = [(f"{n_tests}", "automated tests"), ("96", "paired serving runs"), ("0", "hand-typed numbers"), ("v1.1.0", "tagged, reproducible release")]
+    for i, (big, small) in enumerate(tiles2):
+        stat(s, X0 + i * (pw4 + 0.18), 5.45, pw4, 1.05, big, small, color=NAVY, big_size=26, small_size=13)
+    text(s, X0, 6.6, W, 0.32, "Anyone can verify: make figure (no GPU) rebuilds the figures from saved data; make quick-bench reruns a 5-minute GPU benchmark.",
+         size=12, color=GREY)
+    notes(s, """
+Why should you believe our numbers? Four reasons. A correctness gate: every kernel is compared with a reference before it is timed, and that gate is exactly what caught
+Marlin's wrong outputs. Honest timing: weights rotate through 768 megabytes so they always come from DRAM, and CUDA graphs remove launch overhead. Paired, seeded
+statistics: the same traffic goes through every policy, with Holm-corrected tests over eight repetitions. And we corrected ourselves: two of our earlier claims did not
+survive our own cross-checks and we retracted them. Every number is produced by a script, there are 81 automated tests, and the release can be verified with one command.
+""")
+
+    # ================================================================== 8c. results divider: the story
+    s = new("")
+    dark_slide(s, (RGBColorHex("5E0014"), CRIMSON))
+    text(s, 0.8, 0.55, 11.7, 0.4, "THE RESULTS", size=15, bold=True, color=RGBColorHex(LIGHT_ON_DARK))
+    text(s, 0.8, 0.95, 11.8, 0.9, "Seven findings, one story", size=40, bold=True, color=WHITE, font="Times New Roman")
+    act2 = p99[("rho0.6", "split-active")]["e2e_p99"] / p99[("rho0.6", "single")]["e2e_p99"]
+    story = [("Built a kernel", f"{k['speedup']:.2f}× FP16 cuBLAS"), ("Put it in vLLM", f"{e['inferno_b8']['1']:.0f} tok/s = Marlin"),
+             ("Mapped every layer", "decision: keep Marlin"), ("Checked correctness", "Marlin: 3 batch sizes wrong"),
+             ("Tested routing (H1)", f"rejected: +{lo:.0f}–{hi:.0f}% p99"), ("Found the mechanism", f"active 2nd replica = {act2:.1f}× p99"),
+             ("Measured MPI & int4", f"≈{mpi_us:.0f} µs hop · {f16.p50 / i4.p50:.1f}× lower latency")]
+    cw7, ch7, g7 = 2.75, 1.85, 0.27
+    for i, (t, r_) in enumerate(story):
+        row, col_ = divmod(i, 4)
+        x = 0.8 + col_ * (cw7 + g7) + row * (cw7 + g7) / 2
+        y = 2.25 + row * (ch7 + 0.45)
+        box(s, x, y, cw7, ch7, fill=RGBColorHex("6E0A1F"), line=RGBColorHex("C4475F"), radius=0.08)
+        badge(s, x + 0.18, y + 0.18, 0.5, str(i + 1), WHITE, color=CRIMSON, size=16)
+        text(s, x + 0.8, y + 0.15, cw7 - 0.9, 0.56, t, size=16, bold=True, color=WHITE, anchor="m")
+        text(s, x + 0.2, y + 0.85, cw7 - 0.35, 0.9, r_, size=16.5, bold=True, color=RGBColorHex("FFD27A"))
+        if (row == 0 and col_ < 3) or (row == 1 and col_ < 2):
+            arrow(s, x + cw7 + 0.03, y + ch7 / 2, x + cw7 + g7 - 0.03, y + ch7 / 2, color=RGBColorHex(LIGHT_ON_DARK), width=2.5)
+    notes(s, """
+The results as one story, in seven steps. We built a kernel and pushed it to the memory limit. We put it inside vLLM and reached parity with the production kernel.
+We mapped every layer and batch size, and the data told us to keep the production kernel. That same benchmark's correctness check caught the production kernel returning
+wrong answers at three batch sizes. On the serving side our adaptive-routing hypothesis was rejected, and a controlled experiment found the mechanism. Finally we
+measured the MPI layer and quantization. The next slides take these one at a time.
 """)
 
     # ================================================================== 9. results at a glance
@@ -465,6 +573,21 @@ coordination is not the bottleneck, the shared GPU is. Quantization: at the same
 why our adaptive design routes across pre-loaded replicas instead of reconfiguring.
 """)
 
+    # ================================================================== 16b. working system
+    s = new("A Working System, Not Just Slides", "6 · DEMO")
+    picture(s, FIG / "ppt_hero.png", X0, 1.35, w=7.2)
+    picture(s, FIG / "ppt_kernel.png", X0 + 7.55, 1.35, w=4.9)
+    picture(s, FIG / "ppt_verdict.png", X0 + 7.55, 1.35 + 4.9 * 800 / 1210 + 0.22, w=4.9)
+    y_ = 1.35 + 7.2 * 760 / 1300 + 0.25
+    for i, (c_, col, tint) in enumerate([("live request replay", CRIMSON, TINT), ("kernel explorer", NAVY, PALE), ("verdict with CIs", GREEN, GREENTINT)]):
+        chip(s, X0 + i * 2.43, y_, 2.3, 0.42, c_, fill=tint, color=col, size=13)
+    text(s, X0, y_ + 0.6, 7.2, 0.7, "Interactive dashboard (docs/demo/index.html), built from the same result files as this deck. Opens in any browser.",
+         size=14, color=GREY)
+    notes(s, """
+Everything you have seen also runs as an interactive dashboard that opens in any browser. It replays the real requests from our experiments, lets you explore the
+kernel versions, and shows the routing verdict with confidence intervals. It is generated from the same result files as this presentation, so the two cannot disagree.
+""")
+
     # ================================================================== 17. challenges
     s = new("Challenges", "7 · CHALLENGES")
     ch_ = [("Measurement traps (found & fixed)", ["Cache leak inflated bandwidth ≈ 6% → 768 MB rotation, re-run", "A Marlin baseline was mis-measured → claim retracted",
@@ -546,6 +669,27 @@ adaptive routing a fair test; confirm the Marlin fault on another GPU and report
         labelled(s, X0 + i * 4.2, 4.9, 4.08, 1.9, [[(t, {"bold": True, "color": NAVY, "size": 19})], [(d, {"size": 15.5})]], fill=PALE, line=None, anchor="m",
                  margin=0.22)
     notes(s, "Each member owns a real component of the system and can explain how it connects to the others through the workflow diagram.")
+
+    # ================================================================== 19b. three things to remember
+    s = new("")
+    dark_slide(s, (RGBColorHex("0A1633"), RGBColorHex("1B2F6B")))
+    text(s, 0.8, 0.55, 11.7, 0.4, "IF YOU REMEMBER THREE THINGS", size=15, bold=True, color=RGBColorHex("FFB4C2"))
+    a1, a2 = p99[("rho0.6", "single")]["e2e_p99"], p99[("rho0.6", "split-active")]["e2e_p99"]
+    rem = [("A kernel at the memory limit", f"{k['speedup']:.2f}× FP16 cuBLAS at {k['pct']:.0f}% of bandwidth, and parity with vLLM's production kernel inside a real engine.", "FFD27A"),
+           ("Measure before you ship", "Mapping every layer told us to keep the library kernel, and our correctness check caught that kernel returning wrong answers.", "9EC5FF"),
+           ("Negative results, explained", f"Adaptive routing lost because two active replicas share one GPU: p99 {a1:.2f} s → {a2:.2f} s. Next test: one replica per GPU.", "7EE0B5")]
+    for i, (t, d, col) in enumerate(rem):
+        y = 1.2 + i * 1.75
+        text(s, 0.8, y, 1.2, 1.4, str(i + 1), size=72, bold=True, color=RGBColorHex(col), font="Times New Roman", anchor="m")
+        text(s, 2.1, y + 0.1, 10.4, 0.6, t, size=28, bold=True, color=WHITE, font="Times New Roman")
+        text(s, 2.1, y + 0.72, 10.4, 0.75, d, size=17, color=RGBColorHex("DCE6F7"))
+    text(s, 0.8, 6.45, 11.8, 0.4, "github.com/Likhith1807/Inferno-Adaptive-LLM-Inference-Serving  ·  release v1.1.0", size=14,
+         color=RGBColorHex("B9C7E4"), align="c")
+    notes(s, """
+If you remember three things. One: we wrote a kernel that reaches the hardware memory limit and matches the production kernel inside a real engine. Two: measure before
+you ship; a careful study told us not to replace the library kernel, and our correctness check found that the library kernel itself returns wrong answers in some cases
+on our machine. Three: our main hypothesis failed, and we explained exactly why; the next experiment, one replica per GPU, follows directly from that. Thank you.
+""")
 
     # ================================================================== 20. references
     refs = ["G.-I. Yu et al., “Orca: A distributed serving system for transformer-based generative models,” in Proc. USENIX OSDI, 2022.",
