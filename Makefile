@@ -98,6 +98,7 @@ clean:
 # Milestone 5: headline figure from saved data only (no GPU needed)
 figure:
 	python scripts/make_headline_figure.py
+	python scripts/make_result_figures.py
 
 # Short GPU benchmark for independent reproduction (~3-5 min); writes results/quick/<timestamp>/
 quick-bench:

@@ -18,7 +18,7 @@ Open [`docs/demo/index.html`](docs/demo/index.html) in a browser (or host it on 
 - **Kernel:** a hand-written fused int4 GEMV reaches 95% of theoretical DRAM bandwidth (97% of the measured streaming-read bandwidth) and 3.67x fp16 cuBLAS on `llama7B_mlp_up` (byte-ratio ceiling 3.76x). Inside vLLM (CUDA graphs, one sequence) it decodes at 144 tok/s vs 143 for the default Marlin path (67 for fp16), and Marlin is faster with 4+ concurrent sequences. It does not beat vLLM's Marlin kernel at batch 1 (an earlier claim that it did was a measurement error, since corrected).
 - **Adaptive routing (H1) was rejected:** p99 +112% to +204% versus the best fixed configuration, 8 paired repetitions, Holm-corrected.
 - **Why:** a second *active* replica on the same GPU multiplies p99 by 2.1x; an idle resident one costs nothing (60% load: 6.21 s one server, 6.26 s with an idle second replica, 13.02 s with both serving; 5 paired reps). Replicas need separate devices.
-- **Kernel vs vLLM's Marlin, every Qwen layer, batch 1-64:** the custom kernel wins only on qkv/o_proj at batch 1 (15% of decode GEMM time), ties the large layers, and is 2-7x slower from batch 4. Decision: keep Marlin; effort moves to routing.
+- **Kernel vs vLLM's Marlin, every Qwen layer, batch 1-64:** the custom kernel wins only on qkv/o_proj at batch 1 (15% of decode GEMM time), ties the large layers, and is 1.7-7.4x slower from batch 4. Decision: keep Marlin; effort moves to routing.
 - **Correctness finding (unconfirmed elsewhere):** on this machine vLLM 0.11's Marlin int4 GEMM gave intermittent errors up to 28% at batches [32, 64, 128], correct at [1, 8, 16, 48]; caught by the benchmark's reference check ([report](docs/results/marlin_fault/report.md)).
 - **Quantization (same offered load):** int4 vs fp16 cuts p50 latency 2.1x and lifts tokens/joule +12%; reconfiguring a server costs ~48 s, so adaptivity has to route across pre-loaded replicas.
 - **MPI routing:** ~2 us per hop in isolation, no measurable end-to-end difference from an HTTP router.
@@ -91,6 +91,12 @@ make quick-bench   # ~3-5 min GPU run: hardware record + kernel/Marlin/AWQ timin
 ```
 
 ![headline](docs/figures/headline_light.png)
+
+| Where the custom kernel earns its place | Marlin correctness probe (one machine, unconfirmed elsewhere) |
+|---|---|
+| ![custom vs Marlin](docs/figures/custom_vs_marlin.png) | ![Marlin fault](docs/figures/marlin_fault.png) |
+
+![layer matrix](docs/figures/layer_matrix.png)
 
 Reproducing on your own machine? Follow [`docs/REPRODUCE.md`](docs/REPRODUCE.md) and send back the files it lists.
 

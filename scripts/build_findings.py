@@ -228,7 +228,9 @@ def main():
                    < lm["shapes"][n]["cells"]["marlin/B1"]["us_min"]]
         wins_share = sum(share[n] for n in b1_wins)
         hi = max(r[16] for r in ratio.values() if 16 in r)
+        lo4 = min(r[4] for r in ratio.values() if 4 in r)
         facts["lm"] = (ratio, share, b1_wins, wins_share, hi)
+        facts["lm_lo4"] = lo4
         F.append("## 5. Where the custom kernel earns its place: almost nowhere (decision: keep vLLM's Marlin)\n")
         F.append("Every Qwen2.5-1.5B decode layer at batch 1-64, same AWQ weights for every implementation, weights "
                  "streamed from DRAM, CUDA-graph timing (`docs/results/layer_matrix/report.md`, "
@@ -237,7 +239,7 @@ def main():
                  + f". The custom kernel clearly wins only on {', '.join(b1_wins) or 'no layer'}, "
                  f"which are {wins_share:.0f}% of quantized-GEMM time per decode step; the two large layers "
                  f"(gate_up {share['gate_up']:.0f}%, down {share['down']:.0f}%) are ties.")
-        F.append(f"- From batch 4 the custom kernel is 2-{hi:.0f}x slower: its time grows roughly linearly with batch "
+        F.append(f"- From batch 4 the custom kernel is {lo4:.1f}-{hi:.1f}x slower: its time grows roughly linearly with batch "
                  "(CUDA-core arithmetic per weight scales with batch), while Marlin's tensor-core path stays flat to batch 16.")
         F.append("- One-time layout conversion is negligible for both (milliseconds per layer at load).")
         F.append("- **Decision (pre-stated rule):** the built-in path already matches the custom kernel on the layers "
@@ -299,7 +301,7 @@ def main():
         ratio, share, b1_wins, wins_share, hi = facts["lm"]
         S.append(f"- **Kernel vs vLLM's Marlin, every Qwen layer, batch 1-64:** the custom kernel wins only on "
                  f"{'/'.join(b1_wins) or 'no layer'} at batch 1 ({wins_share:.0f}% of decode GEMM time), ties the large "
-                 f"layers, and is 2-{hi:.0f}x slower from batch 4. Decision: keep Marlin; effort moves to routing.")
+                 f"layers, and is {facts['lm_lo4']:.1f}-{hi:.1f}x slower from batch 4. Decision: keep Marlin; effort moves to routing.")
     if "mf" in facts:
         mf = facts["mf"]
         S.append(f"- **Correctness finding (unconfirmed elsewhere):** on this machine vLLM 0.11's Marlin int4 GEMM gave "
@@ -400,7 +402,7 @@ def main():
     if "lm" in facts:
         ratio, share, b1_wins, wins_share, hi = facts["lm"]
         P.append(f"- Benchmarked the kernel against vLLM's Marlin and AWQ paths on every Qwen2.5 decode layer at batch "
-                 f"1-64; it won only layers worth {wins_share:.0f}% of decode GEMM time and lost up to {hi:.0f}x at batch 16, "
+                 f"1-64; it won only layers worth {wins_share:.0f}% of decode GEMM time and lost up to {hi:.1f}x at batch 16, "
                  "so I kept the library path and redirected effort; the harness's reference check also flagged "
                  "batch-dependent wrong results from Marlin on this machine.")
     if "h1" in facts and cont:

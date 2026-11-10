@@ -87,7 +87,7 @@ Steady load at 0.6x the measured capacity of the best configuration; 3 repetitio
 Every Qwen2.5-1.5B decode layer at batch 1-64, same AWQ weights for every implementation, weights streamed from DRAM, CUDA-graph timing (`docs/results/layer_matrix/report.md`, `scripts/run_layer_matrix.sh`).
 
 - Custom/Marlin time at batch 1: qkv 0.92, o_proj 0.88, gate_up 1.01, down 1.08. The custom kernel clearly wins only on qkv, o_proj, which are 15% of quantized-GEMM time per decode step; the two large layers (gate_up 58%, down 28%) are ties.
-- From batch 4 the custom kernel is 2-7x slower: its cost grows linearly with batch (it re-reads activations per row on CUDA cores), while Marlin's tensor-core tiles stay flat to batch 16.
+- From batch 4 the custom kernel is 1.7-7.4x slower: its time grows roughly linearly with batch (CUDA-core arithmetic per weight scales with batch), while Marlin's tensor-core path stays flat to batch 16.
 - One-time layout conversion is negligible for both (milliseconds per layer at load).
 - **Decision (pre-stated rule):** the built-in path already matches the custom kernel on the layers that dominate decode, so the kernel is not carried into the serving path as a default; engineering effort goes to routing. The opt-in integration (`inferno.kernels.vllm_int4.install`) stays as a research tool.
 

@@ -15,7 +15,7 @@ Attach: `docs/figures/kernel_speedup.png` (hero) or `docs/results/contention/con
 ## Resume bullets
 
 - Implemented a fused INT4 dequantization + matrix-vector CUDA kernel, verified against a double-precision CPU reference; measured 3.67x over FP16 cuBLAS on a 11008 x 4096 layer at batch 1 (95% of peak DRAM bandwidth; byte-ratio ceiling 3.76x).
-- Benchmarked the kernel against vLLM's Marlin and AWQ paths on every Qwen2.5 decode layer at batch 1-64; it won only layers worth 15% of decode GEMM time and lost up to 7x at batch 16, so I kept the library path and redirected effort; the harness's reference check also flagged batch-dependent wrong results from Marlin on this machine.
+- Benchmarked the kernel against vLLM's Marlin and AWQ paths on every Qwen2.5 decode layer at batch 1-64; it won only layers worth 15% of decode GEMM time and lost up to 7.4x at batch 16, so I kept the library path and redirected effort; the harness's reference check also flagged batch-dependent wrong results from Marlin on this machine.
 - Built an LLM inference benchmark spanning CUDA, vLLM and MPI on an 8 GB RTX 4060; ran a 96-run paired campaign that rejected an adaptive-routing hypothesis. A controlled 5-rep study isolated the cause: at 60% load, activating a second GPU-sharing replica raised p99 from 6.21 s to 13.02 s, while loading it idle gave 6.26 s.
 - Designed an MPI request router with per-hop timestamps and a GPU-free microbenchmark; found it indistinguishable from an HTTP router end to end and traced a 1000x gap between isolated and in-situ hop latency to event-loop scheduling.
 - Automated environment setup (date-pinned CUDA 12.x stack, no-root toolchain) and multi-GPU cloud benchmarking with a self-terminating cost cap (Terraform; not yet applied).

@@ -20,7 +20,7 @@ def chapter_design(figs):
         ["Constraint", "Consequence for the design"],
         ["8&nbsp;GB of GPU memory, shared with the Windows display stack", "A 1.5B-parameter model family; two replicas at 0.36 of GPU memory each (0.72 total, leaving headroom for the display and for vLLM's start-up memory check)."],
         ["A running vLLM server cannot change its batch cap or quantization", "Adaptivity is routing across pre-loaded heterogeneous replicas; reconfiguration is measured, not used (about " + f"{F['cold']:.0f}" + " s per restart)."],
-        ["One physical GPU", "Replicas time-slice the device. This is a defining property of the study, not a footnote, and gets its own controlled experiment (Section 9.4)."],
+        ["One physical GPU", "Replicas time-slice the device. This is a defining property of the study, not a footnote, and gets its own controlled experiment (Section 9.6)."],
         ["Windows host, Linux toolchain in WSL2", "All measurements run inside WSL2; GPU performance counters are gated by a Windows driver setting, which left the kernel profiling question open."],
         ["Single operator, no cluster", "The cloud phase is provided as infrastructure code with a spend cap but was not executed; no multi-node number appears in this report."],
     ], [0.36, 0.64], "Constraints and their consequences.", font=8))

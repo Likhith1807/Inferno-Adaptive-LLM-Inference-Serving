@@ -39,6 +39,20 @@ def cover():
     return out
 
 
+def _abstract_layer():
+    from .sec_results import layer_facts
+    f = layer_facts()
+    if not f:
+        return ""
+    txt = (f" (6) Timed against Marlin, classic AWQ and fp16 on every decode layer at batch 1 to 64, the kernel clearly wins only layers worth "
+           f"{f['wins_share']:.0f}% of decode GEMM time, at batch 1, and is up to {f['max_ratio']:.1f}&times; slower above that, so by a pre-stated rule "
+           "Marlin stays the serving default.")
+    if f["mf"]:
+        txt += (f" The same benchmark&rsquo;s reference check found Marlin returning wrong results (relative error up to {f['mf']['worst_rel_err_faulty']:.2f}) "
+                f"at batch {', '.join(map(str, f['mf']['faulty_batches']))} on this machine, a finding not yet reproduced elsewhere.")
+    return txt
+
+
 def abstract():
     F = data.facts()
     k = F["kern"]
@@ -54,7 +68,7 @@ def abstract():
     e = F["e2e"]
     r1, r4 = F["e2e_ratio_b8"]["1"]["mean"], F["e2e_ratio_b8"]["4"]["mean"]
     out.append(P(
-        f"The study makes five measurements. (1) A hand-written fused int4 dequantize-and-matrix-vector CUDA kernel, verified against a "
+        f"The study makes six measurements. (1) A hand-written fused int4 dequantize-and-matrix-vector CUDA kernel, verified against a "
         f"double-precision CPU reference before any timing, reaches {k['pct']:.0f}% of theoretical DRAM bandwidth "
         f"({100 * k['gbps'] / F['stream_gbps']:.0f}% of the measured streaming-read bandwidth) on the best layer and "
         f"{k['speedup']:.2f}&times; the speed of fp16 cuBLAS, against a byte-ratio ceiling of {k['ceil']:.2f}&times;; the bandwidth figures were corrected "
@@ -70,7 +84,8 @@ def abstract():
         f"at 30% and 60% of capacity, while a resident but idle replica costs {100 * (F['cont_idle'][0] - 1):+.1f}%; a headroom analysis of the existing data shows "
         f"that no pattern-aware choice between the two fixed tiers could have gained more than {F['headroom']['max_headroom_pct']:.1f}% of p99. (5) An MPI request router "
         f"adds about {F['mpi_pp'][64]['one_way_us_est']:.0f}&nbsp;&micro;s per hop in isolation and is statistically indistinguishable from an HTTP "
-        f"router end to end."))
+        f"router end to end."
+        + _abstract_layer()))
     out.append(P(
         "Beyond the results, the report documents the measurement methodology in detail: open-loop load, capacity-relative load "
         "calibration, paired seeded workloads with randomized execution order, correctness gates before timing, L2-defeating kernel "

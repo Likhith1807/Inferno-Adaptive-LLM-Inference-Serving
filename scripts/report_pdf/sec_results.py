@@ -1,6 +1,7 @@
 """Chapters 8-12: implementation and verification, results, discussion, limitations and future work, conclusion."""
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from . import data
@@ -35,6 +36,98 @@ def _ladder(name_prefix: str):
 
 def _fig(path, caption, width=1.0, max_h=None):
     return FIG(path, caption, width, max_h) if Path(path).exists() else []
+
+
+def _json(rel):
+    p = RES / rel
+    return json.loads(p.read_text()) if p.exists() else None
+
+
+def layer_facts():
+    """Derived numbers for the layer-matrix and Marlin-probe sections (None if the data is absent)."""
+    lm, mf = _json("layer_matrix/layer_matrix.json"), _json("marlin_fault/summary.json")
+    if not lm:
+        return None
+    shapes = list(lm["shapes"])
+    B = lm["batches"]
+    cell = lambda n, i, b: lm["shapes"][n]["cells"].get(f"{i}/B{b}")  # noqa: E731
+    ratio = {n: {b: cell(n, "custom", b)["us_median"] / cell(n, "marlin", b)["us_median"] for b in B if cell(n, "custom", b)}
+             for n in shapes}
+    t1 = {n: cell(n, "marlin", 1)["us_median"] for n in shapes}
+    share = {n: 100 * v / sum(t1.values()) for n, v in t1.items()}
+    wins = [n for n in shapes if cell(n, "custom", 1)["us_max"] < cell(n, "marlin", 1)["us_min"]]
+    return {"lm": lm, "mf": mf, "shapes": shapes, "B": B, "ratio": ratio, "share": share, "wins": wins,
+            "wins_share": sum(share[n] for n in wins), "max_ratio": max(max(r.values()) for r in ratio.values()),
+            "cell": cell}
+
+
+def _layer_matrix_section():
+    f = layer_facts()
+    if not f:
+        return []
+    lm, mf, shapes, B, ratio, share, cell = f["lm"], f["mf"], f["shapes"], f["B"], f["ratio"], f["share"], f["cell"]
+    out = _Out(H(2, "Where the custom kernel earns its place: every layer, batch 1 to 64"))
+    out.append(P(
+        f"The in-situ comparison above covers batch 1 and a few concurrency levels. To decide whether the kernel belongs in the serving path at all, every "
+        f"Qwen2.5-1.5B decode layer was timed at batch sizes {', '.join(map(str, B))} against vLLM&rsquo;s Marlin path, the classic AWQ path and fp16 cuBLAS, "
+        f"each called exactly as vLLM calls it, on the <i>same</i> AutoAWQ weights converted once into each layout. Every cell is one CUDA graph holding one call per "
+        f"weight copy, with copies rotated over at least {lm['rotate_mb']:.0f}&nbsp;MB (24&times; L2) so each call streams its weights from DRAM, replayed "
+        f"{lm['reps']} times per trial over {lm['trials']} trials; launch overhead is excluded for every implementation alike. "
+        "A cell counts as a win only when the winner&rsquo;s slowest trial beats the runner-up&rsquo;s fastest. The decision rule was fixed before the run: carry the kernel "
+        "into vLLM only if it consistently wins on layers that account for meaningful decode time."))
+    rows = [["Layer (N &times; K)", "share"] + [f"B={b}" for b in B]]
+    for n in shapes:
+        s = lm["shapes"][n]
+        rows.append([f"{n} ({s['N']}&times;{s['K']})", f"{share[n]:.0f}%"]
+                    + [("<b>%.2f</b>" % ratio[n][b] if ratio[n][b] < 1 else "%.2f" % ratio[n][b]) if b in ratio[n] else "n/a" for b in B])
+    out.append(TABLE(rows, [0.22, 0.08] + [0.70 / len(B)] * len(B),
+                     "Custom-kernel time divided by Marlin time (below 1, in bold, means the custom kernel is faster). Share: fraction of quantized-GEMM time per "
+                     "decode step at batch 1. n/a: the custom kernel is instantiated only up to batch 16; the deployed path falls back above that.",
+                     font=7.4, align=["LEFT"] + ["RIGHT"] * (len(B) + 1)))
+    out += _fig(FIGS / "custom_vs_marlin.png", "Where the custom kernel earns its place: custom/Marlin time ratio by layer and batch size.", 0.9)
+    out += _fig(FIGS / "layer_matrix.png", "Microseconds per call by batch size for each Qwen2.5-1.5B decode layer and implementation. Hollow markers: batch sizes at "
+                "which Marlin&rsquo;s output was wrong in the correctness probe (next section).", 1.0)
+    conv = {i: max(lm["shapes"][n]["conversion_ms"][i] for n in shapes) for i in ("custom", "marlin")}
+    hi16 = max(r[16] for r in ratio.values() if 16 in r)
+    out.append(P(
+        f"At batch 1 the custom kernel clearly wins only on {' and '.join(f['wins']) or 'no layer'} ({f['wins_share']:.0f}% of decode GEMM time) and ties on the two large "
+        f"layers that carry {share['gate_up'] + share['down']:.0f}% of it. From batch 4 it is {min(r[4] for r in ratio.values()):.1f} to {max(r[4] for r in ratio.values()):.1f}&times; "
+        f"slower, rising to {hi16:.1f}&times; at batch 16: its time grows almost linearly with the batch (each weight is multiplied on CUDA cores once per token), while "
+        "Marlin&rsquo;s tensor-core path stays flat to batch 16 because weight traffic, not arithmetic, sets its time. The one-time layout conversion is negligible for both "
+        f"(at most {conv['custom']:.0f}&nbsp;ms per layer for the custom layout and {conv['marlin']:.0f}&nbsp;ms for Marlin&rsquo;s, paid once at load). "
+        f"Every implementation matched the dequantize-and-matmul reference (custom kernel worst {max(lm['shapes'][n]['max_rel_err']['custom'] for n in shapes):.0e}) "
+        "except one Marlin cell, which led to the next section."))
+    out.append(CALLOUT("Decision", "The built-in Marlin path already matches the custom kernel on the layers that dominate decode and is far faster at every batch above 2. "
+                       "Following the pre-stated rule, the kernel is not made a serving default and the paired end-to-end serving test of a modified engine is not run; "
+                       "the opt-in switch (<font name='Mono'>vllm_int4.install()</font>) remains as a research tool, and engineering effort moves to the routing experiment."))
+
+    if mf:
+        out += H(2, "Correctness probe: Marlin returned wrong results at some batch sizes")
+        out.append(P(
+            f"The reference check above flagged Marlin on one layer. Marlin was then called 40 times with identical inputs per cell, in four variants: back-to-back with "
+            f"vLLM&rsquo;s shared workspace (as vLLM runs it), with NaN-filled allocations between calls, with a freshly zeroed workspace for every call, and with a device "
+            f"synchronize between calls. Batches {', '.join(map(str, mf['faulty_batches']))} produced intermittent wrong results on every layer tested, with relative max errors "
+            f"up to {mf['worst_rel_err_faulty']:.2f}; batches {', '.join(map(str, mf['clean_batches']))} were always correct (worst {mf['worst_rel_err_clean']:.0e}). "
+            "The custom kernel, the classic AWQ kernel and fp16 are deterministic and correct on the same inputs. A freshly zeroed workspace does not remove the fault, "
+            "so stale lock state in the shared workspace is not the explanation; the cause was not established."))
+        rows = [["Layer", "variant"] + [f"B={b}" for b in mf["batches"]]]
+        for s in mf["shapes"]:
+            for v in ("plain", "fresh_ws"):
+                rows.append([s["name"], v] + [str(next((r["bad"] for r in s["rows"] if r["B"] == b and r["variant"] == v), "")) for b in mf["batches"]])
+        out.append(TABLE(rows, [0.14, 0.12] + [0.74 / len(mf["batches"])] * len(mf["batches"]),
+                         "Marlin calls with wrong output (relative max error above 1e-2) out of 40 identical calls. plain: shared workspace as in vLLM; fresh_ws: newly zeroed "
+                         "workspace per call. All variants: docs/results/marlin_fault/report.md.", font=7.4, align=["LEFT", "LEFT"] + ["RIGHT"] * len(mf["batches"])))
+        out += _fig(FIGS / "marlin_fault.png", "Marlin calls with wrong output by batch size and layer (shared workspace, 40 calls per bar).", 0.92)
+        e2e = mf.get("e2e") or {}
+        out.append(P(
+            f"<b>Status: {mf['status']}.</b> vLLM pads decode batches to captured sizes that include 32 and 64, so if the fault is general it would corrupt real serving "
+            "at moderate concurrency; it may equally be specific to WSL2, this driver (566.07) or this laptop GPU. "
+            + ("The real-checkpoint check is reported in docs/results/marlin_fault/report.md. " if e2e else
+               "The real-checkpoint check (greedy decode of the AWQ model at batch 1 versus 32/64, against the classic AWQ path) was written but could not run on the "
+               "development machine during this revision, and no second machine was available. ")
+            + "It is therefore not reported upstream, and the Marlin timings at the affected batch sizes in the previous section carry this caveat. "
+              "<font name='Mono'>make marlin-probe</font> and <font name='Mono'>make quick-bench</font> reproduce it; docs/REPRODUCE.md asks independent testers to report either outcome."))
+    return out
 
 
 # ============================================================================================ chapter 8
@@ -231,6 +324,8 @@ def chapter_results():
         f"Saturated with the same open-loop request process, a vLLM server using the Marlin path sustained {cal['steady_tok']:.0f} output tokens/s against {cal['awq_tok']:.0f} for the classic AWQ "
         f"path, a ratio of {F['marlin_ratio']:.2f}&times;. A batch-1 kernel is a latency-sensitive, low-concurrency result and says little about saturated serving."))
 
+    out += _layer_matrix_section()
+
     # ------------------------------------------------------------------ 9.3 campaign
     out += H(2, "Campaign: adaptive versus fixed routing")
     out.append(P(
@@ -345,12 +440,13 @@ def chapter_results():
 # ============================================================================================ chapter 10-12
 def chapter_discussion():
     F = data.facts()
+    LF = layer_facts()
     k = F["kern"]
     out = _Out(H(1, "Discussion"))
     out += H(2, "Answers to the research questions")
     out.append(TABLE([
         ["Question", "Answer supported by the data"],
-        ["RQ1 Kernel vs roofline and vLLM", f"On the best bandwidth-bound layer the kernel reached {k['pct']:.0f}% of theoretical DRAM bandwidth ({100 * k['gbps'] / F['stream_gbps']:.0f}% of the measured streaming-read bandwidth) and {k['speedup']:.2f}&times; cuBLAS. Inside vLLM with CUDA graphs it decodes at parity with the default Marlin path at one sequence ({F['e2e_ratio_b8']['1']['mean']:.2f}&times;), ahead of the classic AWQ kernel, and slower than Marlin with four sequences ({F['e2e_ratio_b8']['4']['mean']:.2f}&times;). It does not beat Marlin; an earlier claim that it did was a measurement error. Above a batch of about 8 a CUDA-core kernel loses to cuBLAS."],
+        ["RQ1 Kernel vs roofline and vLLM", f"On the best bandwidth-bound layer the kernel reached {k['pct']:.0f}% of theoretical DRAM bandwidth ({100 * k['gbps'] / F['stream_gbps']:.0f}% of the measured streaming-read bandwidth) and {k['speedup']:.2f}&times; cuBLAS. Inside vLLM with CUDA graphs it decodes at parity with the default Marlin path at one sequence ({F['e2e_ratio_b8']['1']['mean']:.2f}&times;), ahead of the classic AWQ kernel, and slower than Marlin with four sequences ({F['e2e_ratio_b8']['4']['mean']:.2f}&times;). It does not beat Marlin; an earlier claim that it did was a measurement error. Above a batch of about 8 a CUDA-core kernel loses to cuBLAS." + (f" Across every Qwen layer at batch 1 to 64 it wins only {'/'.join(LF['wins'])} at batch 1 ({LF['wins_share']:.0f}% of decode GEMM time) and is up to {LF['max_ratio']:.1f}&times; slower than Marlin, so Marlin stays the default." if LF else "")],
         ["RQ2 Adaptive vs fixed", "No. Adaptive routing was significantly worse on p99 in all three patterns, with lower throughput and lower tokens per joule. H<sub>1</sub> is rejected."],
         ["RQ3 Mechanism", f"Two active replicas time-slicing one GPU roughly double p99 ({F['cont_active'][0]:.2f}&times; and {F['cont_active'][1]:.2f}&times;) at fixed total load; an idle second replica costs about nothing."],
         ["RQ4 MPI", "Point-to-point latency is a few microseconds; end-to-end, MPI and HTTP routing are indistinguishable in this setup, and dispatch adds about two milliseconds inside the real router. Scaling on one GPU is negative because of co-residency, not because of MPI."],
@@ -361,7 +457,7 @@ def chapter_discussion():
         ["ID", "Outcome", "Evidence and qualifications"],
         ["H1", "Rejected", "Significantly worse p99 in all patterns; non-inferiority guard also failed. Applies to single-GPU replicas."],
         ["H2", "Partly supported", "Scaling on the shared GPU is sub-linear (efficiency below 1); MPI overhead is measured (microseconds isolated, about 2 ms in situ). No replica count at which MPI overhead erodes gains was reached, because two replicas were the maximum on one GPU."],
-        ["H3", "Refuted as stated; explanation unresolved", "The kernel reaches the memory limit on large layers rather than a fraction of the library path, and is at parity with Marlin end to end at batch 1 (not a win). The part of H3 that requires profiler counters to explain differences was not completed."],
+        ["H3", "Refuted as stated; explanation unresolved", "The kernel reaches the memory limit on large layers rather than a fraction of the library path, and is at parity with Marlin end to end at batch 1 (not a win). The layer matrix confirms it wins only small layers at batch 1. The part of H3 that requires profiler counters to explain differences was not completed."],
         ["H4", "Not supported", "The adaptive policy lowered tokens per joule by a few percent. The only efficiency gain measured came from quantization, which is a model change."],
     ], [0.07, 0.24, 0.69], "Hypothesis outcomes.", font=8))
     out += H(2, "Why the adaptive policy lost")
@@ -384,6 +480,7 @@ def chapter_discussion():
         "The kernel result is <b>batch 1 and very small batches</b>, memory-bound, on one GPU. Above a batch of about 8 it loses to fp16 cuBLAS, and end to end Marlin is clearly faster from four sequences.",
         "<b>Parity with Marlin is not a win.</b> Marlin is at the bandwidth limit on the large layers, so there is no headroom to beat it at batch 1 on this GPU; the honest claim is that a from-scratch kernel reached the same place.",
         "Reaching the byte-ratio ceiling on one shape shows the kernel is near the limit for that shape, not that it is state-of-the-art for all shapes. The small layers sit far below the ceiling, consistent with launch and clock jitter dominating 12 to 15 microsecond kernels.",
+        "The layer matrix makes this concrete: the only clear wins are the two small layers at batch 1, which carry about one seventh of the quantized-GEMM time.",
         "End-to-end decode also spends time outside the quantized layers (the fp16 output projection over the vocabulary, attention, normalization, sampling), so a faster int4 kernel moves tokens per second less than it moves kernel time.",
     ]))
     out += H(2, "Methodological observations")
@@ -404,6 +501,7 @@ def chapter_limits():
         "<b>Replicas share a GPU.</b> This is the dominant limitation for the routing result and the reason it should not be generalized to multi-GPU deployments.",
         "<b>No profiler counters.</b> The bank-conflict prediction and the causes of the v4 slowdown and of the v5/v6 gains are hypotheses (the counter permission was re-checked during the work and is still blocked).",
         "<b>The end-to-end comparison is one model on one GPU</b> with three process repetitions per configuration, so intervals are wide and the parity with Marlin is a statement about a few percent, not about small differences.",
+        "<b>The Marlin correctness fault is observed on one machine.</b> It is reproducible there at the kernel level, but it has not been checked on the real checkpoint end to end or on a second GPU, so it is not attributed to vLLM.",
         "<b>No cloud run.</b> Infrastructure code with a cost cap is provided but was not applied; no multi-node or multi-GPU result is reported.",
         "<b>Synthetic workloads and quality not evaluated.</b> No accuracy or perplexity comparison across quantization levels was made.",
         "<b>Modest repetition counts.</b> Eight repetitions for the campaign, five for the mechanism study, four for scaling, three for the sweep; small effects are out of reach.",
@@ -413,6 +511,7 @@ def chapter_limits():
     out += H(2, "Future work, in order of expected value")
     out.append(NUM([
         "<b>Enable GPU performance counters and run Nsight Compute</b> on the kernel ladder (one-time driver setting, then <font name='Mono'>make kernel-profile</font>), to confirm or refute the bank-conflict and occupancy hypotheses and to explain the v4 slowdown.",
+        "<b>Reproduce the Marlin fault elsewhere</b> (<font name='Mono'>make quick-bench</font> on another GPU, then the real-checkpoint probe). If it reproduces, report it upstream with the minimal script; if not, record it as machine-specific.",
         "<b>Run the cloud phase</b> with one replica per GPU. This is the experiment that tests the prediction in Chapter 10: with independent capacity, does load- and length-aware routing beat the best fixed configuration?",
         "<b>Try MPS</b> for concurrent kernel execution across the two replicas on one GPU, to see whether the co-residency penalty is reducible without extra hardware.",
         "<b>A tensor-core variant for batches of 8 to 64</b>, the range where the CUDA-core kernel loses to cuBLAS and to Marlin, so that one code path covers decode at every concurrency.",
@@ -429,18 +528,19 @@ def chapter_conclusion():
     h1 = F["h1"]
     lo, hi = min(r["pct_change"] for r in h1), max(r["pct_change"] for r in h1)
     out = _Out(H(1, "Conclusion"))
+    LF = layer_facts()
     e = F["e2e"]
     r1, r4 = F["e2e_ratio_b8"]["1"]["mean"], F["e2e_ratio_b8"]["4"]["mean"]
     out.append(P(
         f"This study built and measured an LLM-serving testbed spanning a CUDA kernel, its integration into vLLM, an MPI router and an adaptive routing controller on a single 8&nbsp;GB GPU, "
-        f"with the protocol and statistics fixed in advance. Four findings stand. First, a hand-written fused int4 GEMV can reach the memory roofline "
+        f"with the protocol and statistics fixed in advance. " + ("Five" if LF else "Four") + f" findings stand. First, a hand-written fused int4 GEMV can reach the memory roofline "
         f"({k['pct']:.0f}% of theoretical bandwidth, {k['speedup']:.2f}&times; cuBLAS, against a {k['ceil']:.2f}&times; byte-ratio ceiling) on a large layer. Second, inside vLLM it is at parity "
         f"with the default Marlin path at one sequence ({e['inferno_b8']['1']:.0f} against {e['awq_marlin']['1']:.0f} tokens/s, ratio {r1:.2f}), ahead of the classic AWQ kernel and of fp16, and behind Marlin "
         f"with four concurrent sequences ({r4:.2f}); it does not beat the library. Third, the hypothesis that adaptive routing over pre-loaded replicas would beat the best fixed configuration was "
         f"<b>rejected</b>: p99 was {lo:.0f}% to {hi:.0f}% worse, a controlled experiment attributes this to two active servers contending for one GPU, and the headroom for any pattern-aware choice was at most "
-        f"{F['headroom']['max_headroom_pct']:.1f}% anyway. Fourth, MPI routing is cheap in isolation and indistinguishable from HTTP routing end to end in this setup."))
+        f"{F['headroom']['max_headroom_pct']:.1f}% anyway. Fourth, MPI routing is cheap in isolation and indistinguishable from HTTP routing end to end in this setup." + (f" Fifth, across every decode layer at batch 1 to 64 the kernel wins only layers worth {LF['wins_share']:.0f}% of decode GEMM time, so by the pre-stated rule Marlin stays the default; the same benchmark&rsquo;s reference check exposed batch-dependent wrong results from Marlin on this machine, a finding that awaits reproduction elsewhere." if LF else "")))
     out.append(P(
         "The main contribution is less any one number than the demonstration that each claim was tested with an instrument that had itself been checked, "
         "including two checks that overturned the study&rsquo;s own earlier claims, and that the study reports what it did not achieve: no profiler counters, no cloud run, no win "
-        "over the production kernel, and a routing result that applies only to replicas sharing a device."))
+        "over the production kernel, no independent reproduction yet, and a routing result that applies only to replicas sharing a device."))
     return out
